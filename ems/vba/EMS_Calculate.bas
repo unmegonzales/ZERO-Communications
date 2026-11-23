@@ -298,11 +298,14 @@ Private Sub VendorCosts(ByVal eventId As Long, ByVal payeeId As Long, ByVal even
 End Sub
 
 Public Function EMSEnsureIceColumn()
+    Dim rs As Object
     On Error Resume Next
-    CurrentDb.TableDefs("tblVendorInput").Fields("IceAmount").Name
+    Set rs = CurrentDb.OpenRecordset("SELECT IceAmount FROM tblVendorInput WHERE 1=0", EMS_SNAPSHOT)
     If Err.Number <> 0 Then
         Err.Clear
         CurrentDb.Execute "ALTER TABLE tblVendorInput ADD COLUMN IceAmount CURRENCY"
+    Else
+        rs.Close
     End If
     On Error GoTo 0
 End Function
