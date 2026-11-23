@@ -27,9 +27,13 @@ End Sub
 
 Public Function Scalar(ByVal sql As String) As Variant
     Dim rs As Object
+    On Error GoTo Failed
     Set rs = CurrentDb.OpenRecordset(sql, EMS_SNAPSHOT)
     If rs.EOF Then Scalar = Null Else Scalar = rs.Fields(0).Value
     rs.Close
+    Exit Function
+Failed:
+    Err.Raise Err.Number, "EMS", Err.Description & vbCrLf & Left$(sql, 240)
 End Function
 
 Public Function MoneyRound(ByVal value As Variant) As Currency

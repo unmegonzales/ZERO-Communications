@@ -602,6 +602,16 @@ Public Sub EMSEnsureEmailColumns()
     EnsureColumn "tblPayeeEmail", "EmailAddress", "TEXT(255)", False
     EnsureColumn "tblPayeeEmail", "Label", "TEXT(255)", False
     EnsureColumn "tblPayeeEmail", "IsPrimary", "YESNO", False
+    If Not ColumnExists("tblPayeeEmail", "EmailID") Then
+        On Error Resume Next
+        CurrentDb.Execute "ALTER TABLE [tblPayeeEmail] ADD COLUMN [EmailID] COUNTER"
+        If Err.Number <> 0 Then
+            Err.Clear
+            CurrentDb.Execute "ALTER TABLE [tblPayeeEmail] ADD COLUMN [EmailID] AUTOINCREMENT"
+        End If
+        CurrentDb.TableDefs.Refresh
+        On Error GoTo 0
+    End If
     If Len(prior) > 0 Then
         On Error Resume Next
         CurrentDb.Execute "UPDATE tblPayeeEmail SET [EmailAddress]=[" & prior & "] WHERE [EmailAddress] Is Null OR [EmailAddress]=''"
@@ -641,18 +651,27 @@ Public Sub EMSDropPayeeQuery()
     On Error GoTo 0
 End Sub
 
+Private Function ColumnExists(ByVal tableName As String, ByVal fieldName As String) As Boolean
+    Dim td As Object
+    Dim fld As Object
+    On Error GoTo Missing
+    Set td = CurrentDb.TableDefs(tableName)
+    For Each fld In td.Fields
+        If StrComp(CStr(fld.Name), fieldName, vbTextCompare) = 0 Then
+            ColumnExists = True
+            Exit Function
+        End If
+    Next fld
+    Exit Function
+Missing:
+    ColumnExists = False
+End Function
+
 Private Sub EnsureColumn(ByVal tableName As String, ByVal fieldName As String, ByVal fieldType As String, ByVal fillYes As Boolean)
     Dim db As Object
-    Dim rs As Object
+    If ColumnExists(tableName, fieldName) Then Exit Sub
     Set db = CurrentDb
     On Error Resume Next
-    Set rs = db.OpenRecordset("SELECT [" & fieldName & "] FROM [" & tableName & "] WHERE 1=0", EMS_SNAPSHOT)
-    If Err.Number = 0 Then
-        rs.Close
-        On Error GoTo 0
-        Exit Sub
-    End If
-    Err.Clear
     db.Execute "ALTER TABLE [" & tableName & "] ADD COLUMN [" & fieldName & "] " & fieldType
     If Err.Number <> 0 Then
         On Error GoTo 0
@@ -793,10 +812,10 @@ Private Function EnsurePayee(ByVal payeeName As String, ByVal payeeType As Strin
     Dim id As Variant
     Dim noteText As String
     If abbreviation = "VOUTREACH" Then
-        id = Scalar("SELECT PayeeID FROM tblPayee WHERE Abbreviation='VICT'")
+        id = Scalar("SELECT [PayeeID] FROM [tblPayee] WHERE [Abbreviation]='VICT'")
         If Not IsNull(id) Then Exec "UPDATE tblPayee SET Abbreviation='VOUTREACH' WHERE PayeeID=" & id
     End If
-    id = Scalar("SELECT PayeeID FROM tblPayee WHERE Abbreviation=" & SqlText(abbreviation))
+    id = Scalar("SELECT [PayeeID] FROM [tblPayee] WHERE [Abbreviation]=" & SqlText(abbreviation))
     noteText = ""
     If Len(contact) > 0 Then noteText = "Primary contact: " & contact
     If abbreviation = "DNHS" Or abbreviation = "VOUTREACH" Then
@@ -809,7 +828,7 @@ Private Function EnsurePayee(ByVal payeeName As String, ByVal payeeType As Strin
         Exec "INSERT INTO tblPayee (PayeeName, PayeeType, Abbreviation, Address1, Address2, SAPID, BSSID, Phone, Notes, [Active]) VALUES (" & _
             SqlText(payeeName) & "," & SqlText(payeeType) & "," & SqlText(abbreviation) & "," & SqlText(address1) & "," & SqlText(address2) & "," & _
             SqlText(sapId) & "," & SqlText(bssId) & ",''," & SqlText(noteText) & "," & IIf(isActive, "-1", "0") & ")"
-        id = Scalar("SELECT PayeeID FROM tblPayee WHERE Abbreviation=" & SqlText(abbreviation))
+        id = Scalar("SELECT [PayeeID] FROM [tblPayee] WHERE [Abbreviation]=" & SqlText(abbreviation))
         added = added + 1
     Else
         FillBlank "tblPayee", "Address1", address1, CLng(id)
@@ -828,8 +847,9 @@ End Sub
 
 Private Sub EnsureEmail(ByVal payeeId As Long, ByVal address As String, ByVal label As String, ByVal isPrimary As Boolean)
     If Len(address) = 0 Then Exit Sub
-    If Not IsNull(Scalar("SELECT EmailID FROM tblPayeeEmail WHERE PayeeID=" & payeeId & " AND EmailAddress=" & SqlText(address))) Then Exit Sub
-    Exec "INSERT INTO tblPayeeEmail (PayeeID, EmailAddress, Label, IsPrimary) VALUES (" & payeeId & "," & SqlText(address) & "," & SqlText(label) & "," & IIf(isPrimary, "-1", "0") & ")"
+    EMSEnsureEmailColumns
+    If CLng(Nz(Scalar("SELECT Count(*) FROM [tblPayeeEmail] WHERE [PayeeID]=" & payeeId & " AND [EmailAddress]=" & SqlText(address)), 0)) > 0 Then Exit Sub
+    Exec "INSERT INTO [tblPayeeEmail] ([PayeeID], [EmailAddress], [Label], [IsPrimary]) VALUES (" & payeeId & "," & SqlText(address) & "," & SqlText(label) & "," & IIf(isPrimary, "-1", "0") & ")"
 End Sub
 
 Private Sub EnsureNpoRates(ByVal payeeId As Long)
