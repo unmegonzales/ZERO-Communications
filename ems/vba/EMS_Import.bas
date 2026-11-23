@@ -68,6 +68,29 @@ Failed:
     MsgBox "Import stopped. Run the import again if this event was only partly loaded." & vbCrLf & Err.Description, vbCritical
 End Sub
 
+Private Sub EnsureImportColumns()
+    EnsureImportColumn "tblImport", "PriceFile", "TEXT(255)"
+    EnsureImportColumn "tblImport", "TipsFile", "TEXT(255)"
+    EnsureImportColumn "tblImport", "ImportedAt", "DATETIME"
+    EnsureImportColumn "tblImport", "IsCurrent", "YESNO"
+    EnsureImportColumn "tblLocation", "Active", "YESNO"
+End Sub
+
+Private Sub EnsureImportColumn(ByVal tableName As String, ByVal fieldName As String, ByVal fieldType As String)
+    Dim td As Object
+    Dim fld As Object
+    Dim found As Boolean
+    On Error GoTo Missing
+    Set td = CurrentDb.TableDefs(tableName)
+    For Each fld In td.Fields
+        If StrComp(CStr(fld.Name), fieldName, vbTextCompare) = 0 Then found = True
+    Next fld
+    If found Then Exit Sub
+    CurrentDb.Execute "ALTER TABLE [" & tableName & "] ADD COLUMN [" & fieldName & "] " & fieldType
+    CurrentDb.TableDefs.Refresh
+Missing:
+End Sub
+
 Private Function ResolveEvent(ByVal eventId As Long, ByVal eventName As String, ByVal eventDay As Date, ByRef created As Boolean) As Long
     Dim rs As Object
     created = False
@@ -126,13 +149,14 @@ End Function
 
 Private Function ReplaceReports(ByVal eventId As Long, ByVal pricePath As String, ByVal tipsPath As String, ByVal priceRows As Collection, ByVal tipRows As Collection) As Long
     Dim importId As Long
+    EnsureImportColumns
     Exec "DELETE FROM tblSale WHERE EventID=" & eventId
     Exec "DELETE FROM tblTip WHERE EventID=" & eventId
     Exec "DELETE FROM tblInvoiceLine WHERE InvoiceID In (SELECT InvoiceID FROM tblInvoice WHERE EventID=" & eventId & ")"
     Exec "DELETE FROM tblInvoice WHERE EventID=" & eventId
     Exec "DELETE FROM tblStaffTip WHERE EventID=" & eventId
     Exec "DELETE FROM tblException WHERE EventID=" & eventId
-    Exec "UPDATE tblImport SET IsCurrent=0 WHERE EventID=" & eventId
+    Exec "UPDATE [tblImport] SET [IsCurrent]=0 WHERE [EventID]=" & eventId
     Exec "INSERT INTO tblImport (EventID, PriceFile, TipsFile, ImportedAt, IsCurrent) VALUES (" & _
         eventId & "," & SqlText(Left$(pricePath, 255)) & "," & SqlText(Left$(tipsPath, 255)) & "," & _
         "#" & Format$(Now, "mm/dd/yyyy hh:nn:ss") & "#,-1)"
