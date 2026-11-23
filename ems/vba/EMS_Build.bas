@@ -212,6 +212,7 @@ Public Sub BuildPayeeScreen()
     DoCmd.Hourglass True
     CloseOpenDesign
     EMSEnsureIceColumn
+    EMSEnsureEmailColumns
     DropObject acForm, "frmPayee"
     DropObject acForm, "fsubEmail"
     DropObject acForm, "fsubRate"
@@ -220,6 +221,7 @@ Public Sub BuildPayeeScreen()
     BuildRate
     BuildVendor
     BuildPayee
+    EMSEnsurePartners
     DoCmd.Hourglass False
     DoCmd.OpenForm "frmPayee"
     Exit Sub

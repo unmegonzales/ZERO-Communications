@@ -6,6 +6,7 @@ Private payeeRows As Variant
 Private payeeCount As Long
 Private payeeSelecting As Boolean
 Private pendingPayeeId As Long
+Private emailsRepaired As Boolean
 
 ' A blank staff headcount holds only that stand's tips. Donation and vendor
 ' checks still calculate. A new event can be typed with no MyVenue file;
@@ -456,6 +457,7 @@ End Function
 
 Public Function EMSPayeeCurrent()
     Dim frm As Object
+    EMSRepairPayeeEmails
     Set frm = Forms!frmPayee
     If IsNull(frm!PayeeID) Then
         If Not payeeSelecting Then frm!lstPayees = Null
@@ -575,6 +577,61 @@ Public Sub EMSEnsurePayeeColumns()
     EnsureColumn "tblPayee", "PayeeType", "TEXT(255)", False
     ' The open file has no Active column. That is the "unknown field" and the list error.
     EnsureColumn "tblPayee", "Active", "YESNO", True
+End Sub
+
+' The email grid was bound to EmailAddress, which this file did not have, so the cell would not show or accept an address.
+Public Sub EMSEnsureEmailColumns()
+    Dim db As Object
+    Dim td As Object
+    Dim fld As Object
+    Dim prior As String
+    EnsureColumn "tblPayeeEmail", "PayeeID", "LONG", False
+    prior = ""
+    On Error Resume Next
+    Set db = CurrentDb
+    Set td = db.TableDefs("tblPayeeEmail")
+    For Each fld In td.Fields
+        If InStr(1, UCase$(CStr(fld.Name)), "EMAIL", vbTextCompare) > 0 Then
+            If StrComp(CStr(fld.Name), "EmailID", vbTextCompare) <> 0 And StrComp(CStr(fld.Name), "EmailAddress", vbTextCompare) <> 0 Then
+                prior = CStr(fld.Name)
+                Exit For
+            End If
+        End If
+    Next fld
+    On Error GoTo 0
+    EnsureColumn "tblPayeeEmail", "EmailAddress", "TEXT(255)", False
+    EnsureColumn "tblPayeeEmail", "Label", "TEXT(255)", False
+    EnsureColumn "tblPayeeEmail", "IsPrimary", "YESNO", False
+    If Len(prior) > 0 Then
+        On Error Resume Next
+        CurrentDb.Execute "UPDATE tblPayeeEmail SET [EmailAddress]=[" & prior & "] WHERE [EmailAddress] Is Null OR [EmailAddress]=''"
+        On Error GoTo 0
+    End If
+End Sub
+
+Public Sub EMSRepairPayeeEmails()
+    Dim host As Object
+    Dim child As Object
+    Dim ctl As Object
+    If emailsRepaired Then Exit Sub
+    EMSEnsureEmailColumns
+    On Error Resume Next
+    EMSEnsurePartners
+    If Not CurrentProject.AllForms("frmPayee").IsLoaded Then
+        emailsRepaired = True
+        Exit Sub
+    End If
+    Set host = Forms!frmPayee
+    Set child = host!fsubEmail.Form
+    child.RecordSource = "tblPayeeEmail"
+    For Each ctl In child.Controls
+        If StrComp(CStr(ctl.Name), "colEmailAddress", vbTextCompare) = 0 Or StrComp(CStr(ctl.ControlSource), "EmailAddress", vbTextCompare) = 0 Then ctl.ControlSource = "EmailAddress"
+        If StrComp(CStr(ctl.Name), "colLabel", vbTextCompare) = 0 Or StrComp(CStr(ctl.ControlSource), "Label", vbTextCompare) = 0 Then ctl.ControlSource = "Label"
+        If StrComp(CStr(ctl.Name), "colIsPrimary", vbTextCompare) = 0 Or StrComp(CStr(ctl.ControlSource), "IsPrimary", vbTextCompare) = 0 Then ctl.ControlSource = "IsPrimary"
+    Next ctl
+    child.Requery
+    emailsRepaired = True
+    On Error GoTo 0
 End Sub
 
 Public Sub EMSDropPayeeQuery()
