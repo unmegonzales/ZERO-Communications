@@ -289,19 +289,29 @@ Private Sub VendorCosts(ByVal eventId As Long, ByVal payeeId As Long, ByVal even
     shortage = 0
     other = 0
     EMSEnsureIceColumn
-    Set rs = CurrentDb.OpenRecordset("SELECT Nz(Sum(CashTender),0) AS CashTender, Nz(Sum(CardTender),0) AS CardTender, Nz(Sum(CorporateVoucher),0) AS CorporateVoucher, Nz(Sum(LevyNfpVoucher),0) AS LevyNfpVoucher, Nz(Sum(UnmGuestVoucher),0) AS UnmGuestVoucher, Nz(Sum(IceAmount),0) AS IceAmount, Nz(Sum(OtherExpense),0) AS OtherExpense FROM tblVendorInput WHERE EventID=" & eventId & " AND PayeeID=" & payeeId, EMS_SNAPSHOT)
-    If rs.EOF Then
-        rs.Close
-        cardFee = MoneyProduct(net, RateOn(payeeId, "CARD_FEE", eventDay, 0.03))
-        Exit Sub
-    End If
-    tenders = CCur(rs!CashTender) + CCur(rs!CardTender) + CCur(rs!CorporateVoucher) + CCur(rs!LevyNfpVoucher) + CCur(rs!UnmGuestVoucher)
-    If tenders <> 0 And tenders < gross Then shortage = gross - tenders
-    ice = CCur(rs!IceAmount)
-    other = CCur(rs!OtherExpense)
-    cardFee = MoneyProduct(net, RateOn(payeeId, "CARD_FEE", eventDay, 0.03))
+    tenders = 0
+    Set rs = CurrentDb.OpenRecordset("SELECT * FROM tblVendorInput WHERE EventID=" & eventId & " AND PayeeID=" & payeeId, EMS_SNAPSHOT)
+    Do While Not rs.EOF
+        tenders = tenders + CCur(Nz(rs!CashTender, 0)) + CCur(Nz(rs!CardTender, 0)) + CCur(Nz(rs!CorporateVoucher, 0)) + CCur(Nz(rs!LevyNfpVoucher, 0)) + CCur(Nz(rs!UnmGuestVoucher, 0))
+        ice = ice + CCur(Nz(FieldValue(rs, "IceAmount"), 0))
+        other = other + CCur(Nz(rs!OtherExpense, 0))
+        rs.MoveNext
+    Loop
     rs.Close
+    If tenders <> 0 And tenders < gross Then shortage = gross - tenders
+    cardFee = MoneyProduct(net, RateOn(payeeId, "CARD_FEE", eventDay, 0.03))
 End Sub
+
+Private Function FieldValue(ByVal rs As Object, ByVal fieldName As String) As Variant
+    Dim index As Long
+    FieldValue = Null
+    For index = 0 To rs.Fields.Count - 1
+        If StrComp(CStr(rs.Fields(index).Name), fieldName, vbTextCompare) = 0 Then
+            FieldValue = rs.Fields(index).Value
+            Exit Function
+        End If
+    Next index
+End Function
 
 Public Function EMSEnsureIceColumn()
     Dim rs As Object
