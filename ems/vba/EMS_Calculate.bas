@@ -520,13 +520,32 @@ End Function
 
 Public Function EMSPayeeFilter()
     Dim frm As Object
-    Dim sql As String
     Set frm = Forms!frmPayee
-    sql = "SELECT p.PayeeID AS [ID], p.PayeeName AS [Payee], p.PayeeType AS [Type], p.Abbreviation AS [Abbrev], p.SAPID AS [SAP ID], p.BSSID AS [BSS ID], IIf(p.Active<>0,'Active','Inactive') AS [Status] FROM tblPayee AS p"
-    If Not Nz(frm!chkShowInactive, False) Then sql = sql & " WHERE p.Active<>0"
-    frm!lstPayees.RowSource = sql & " ORDER BY p.PayeeName"
+    EMSSavePayeeList CBool(Nz(frm!chkShowInactive, False))
+    frm!lstPayees.RowSource = "qryPayeeList"
+    frm!lstPayees.Requery
     If Not IsNull(frm!PayeeID) Then frm!lstPayees = frm!PayeeID
 End Function
+
+' The payee list lives in a saved query. A SQL string on the form was asking for SAPID as a typed value.
+Public Sub EMSSavePayeeList(ByVal showAll As Boolean)
+    Dim db As Object
+    Dim qdf As Object
+    Dim sql As String
+    sql = "SELECT PayeeID AS [ID], PayeeName AS [Payee], PayeeType AS [Type], Abbreviation AS [Abbrev], SAPID AS [SAP ID], BSSID AS [BSS ID], IIf(Active<>0,'Active','Inactive') AS [Status] FROM tblPayee"
+    If Not showAll Then sql = sql & " WHERE Active<>0"
+    sql = sql & " ORDER BY PayeeName;"
+    Set db = CurrentDb
+    On Error Resume Next
+    Set qdf = db.QueryDefs("qryPayeeList")
+    If qdf Is Nothing Then
+        Err.Clear
+        db.CreateQueryDef "qryPayeeList", sql
+    Else
+        qdf.SQL = sql
+    End If
+    On Error GoTo 0
+End Sub
 
 Private Sub EMSPayeeLock(ByVal locked As Boolean)
     Dim frm As Object
