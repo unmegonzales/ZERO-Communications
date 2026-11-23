@@ -2,6 +2,9 @@ Attribute VB_Name = "EMS_Calculate"
 Option Compare Database
 Option Explicit
 
+Private payeeRows As Variant
+Private payeeCount As Long
+
 ' A blank staff headcount holds only that stand's tips. Donation and vendor
 ' checks still calculate. A new event can be typed with no MyVenue file;
 ' stands added by hand use the nets on the row.
@@ -521,30 +524,95 @@ End Function
 Public Function EMSPayeeFilter()
     Dim frm As Object
     Set frm = Forms!frmPayee
-    EMSSavePayeeList CBool(Nz(frm!chkShowInactive, False))
-    frm!lstPayees.RowSource = "qryPayeeList"
     frm!lstPayees.Requery
     If Not IsNull(frm!PayeeID) Then frm!lstPayees = frm!PayeeID
 End Function
 
-' The payee list lives in a saved query. A SQL string on the form was asking for SAPID as a typed value.
-Public Sub EMSSavePayeeList(ByVal showAll As Boolean)
-    Dim db As Object
-    Dim qdf As Object
-    Dim sql As String
-    sql = "SELECT PayeeID AS [ID], PayeeName AS [Payee], PayeeType AS [Type], Abbreviation AS [Abbrev], SAPID AS [SAP ID], BSSID AS [BSS ID], IIf(Active<>0,'Active','Inactive') AS [Status] FROM tblPayee"
-    If Not showAll Then sql = sql & " WHERE Active<>0"
-    sql = sql & " ORDER BY PayeeName;"
-    Set db = CurrentDb
+' Adds any payee columns this screen expects. A missing name is what made Access ask for SAPID.
+Public Sub EMSEnsurePayeeColumns()
+    EnsureColumn "tblPayee", "SAPID", "TEXT(255)"
+    EnsureColumn "tblPayee", "BSSID", "TEXT(255)"
+    EnsureColumn "tblPayee", "Address1", "TEXT(255)"
+    EnsureColumn "tblPayee", "Address2", "TEXT(255)"
+    EnsureColumn "tblPayee", "Phone", "TEXT(255)"
+    EnsureColumn "tblPayee", "Notes", "MEMO"
+    EnsureColumn "tblPayee", "Abbreviation", "TEXT(255)"
+    EnsureColumn "tblPayee", "PayeeType", "TEXT(255)"
+End Sub
+
+Public Sub EMSDropPayeeQuery()
     On Error Resume Next
-    Set qdf = db.QueryDefs("qryPayeeList")
-    If qdf Is Nothing Then
+    CurrentDb.QueryDefs.Delete "qryPayeeList"
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+Private Sub EnsureColumn(ByVal tableName As String, ByVal fieldName As String, ByVal fieldType As String)
+    Dim rs As Object
+    On Error Resume Next
+    Set rs = CurrentDb.OpenRecordset("SELECT [" & fieldName & "] FROM [" & tableName & "] WHERE 1=0", EMS_SNAPSHOT)
+    If Err.Number <> 0 Then
         Err.Clear
-        db.CreateQueryDef "qryPayeeList", sql
+        CurrentDb.Execute "ALTER TABLE [" & tableName & "] ADD COLUMN [" & fieldName & "] " & fieldType
     Else
-        qdf.SQL = sql
+        rs.Close
     End If
     On Error GoTo 0
+End Sub
+
+' Fills the payee list without a query on the form. That query was the SAPID prompt.
+Public Function EMSPayeeList(fld As Control, id As Variant, row As Variant, col As Variant, code As Variant) As Variant
+    Select Case code
+        Case acLBInitialize
+            EMSPayeeList = True
+        Case acLBOpen
+            LoadPayeeRows
+            EMSPayeeList = 1
+        Case acLBGetRowCount
+            EMSPayeeList = payeeCount
+        Case acLBGetColumnCount
+            EMSPayeeList = 7
+        Case acLBGetColumnWidth
+            EMSPayeeList = -1
+        Case acLBGetValue
+            If row >= 0 And row < payeeCount Then EMSPayeeList = payeeRows(row, col)
+    End Select
+End Function
+
+Private Sub LoadPayeeRows()
+    Dim rs As Object
+    Dim sql As String
+    Dim showAll As Boolean
+    Dim index As Long
+    EMSEnsurePayeeColumns
+    showAll = False
+    If CurrentProject.AllForms("frmPayee").IsLoaded Then showAll = CBool(Nz(Forms!frmPayee!chkShowInactive, False))
+    sql = "SELECT PayeeID, PayeeName, PayeeType, Abbreviation, SAPID, BSSID, Active FROM tblPayee"
+    If Not showAll Then sql = sql & " WHERE Active<>0"
+    sql = sql & " ORDER BY PayeeName"
+    Set rs = CurrentDb.OpenRecordset(sql, EMS_SNAPSHOT)
+    payeeCount = 0
+    If rs.EOF Then
+        rs.Close
+        Exit Sub
+    End If
+    rs.MoveLast
+    payeeCount = rs.RecordCount
+    ReDim payeeRows(0 To payeeCount - 1, 0 To 6)
+    rs.MoveFirst
+    index = 0
+    Do While Not rs.EOF
+        payeeRows(index, 0) = rs!PayeeID
+        payeeRows(index, 1) = Nz(rs!PayeeName, "")
+        payeeRows(index, 2) = Nz(rs!PayeeType, "")
+        payeeRows(index, 3) = Nz(rs!Abbreviation, "")
+        payeeRows(index, 4) = Nz(rs!SAPID, "")
+        payeeRows(index, 5) = Nz(rs!BSSID, "")
+        payeeRows(index, 6) = IIf(Nz(rs!Active, False), "Active", "Inactive")
+        index = index + 1
+        rs.MoveNext
+    Loop
+    rs.Close
 End Sub
 
 Private Sub EMSPayeeLock(ByVal locked As Boolean)

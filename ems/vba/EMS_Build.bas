@@ -159,13 +159,22 @@ Private Sub BuildPayee()
     ButtonForm frm.Name, "cmdHome", "Home", "=EMSBackToEvents()", 7800, 140, 1400, 400
     ButtonForm frm.Name, "cmdBulk", "Bulk edit vendors", "=EMSBulkPayees()", 9360, 140, 2500, 400
     ButtonForm frm.Name, "cmdNew", "New payee", "=GoToNewPayee()", 12020, 140, 1800, 400
-    Set ctl = AddControl(frm.Name, acForm, acListBox, acDetail, "lstPayees", 240, 80, 14320, 2680)
+    EMSEnsurePayeeColumns
+    EMSDropPayeeQuery
+    ListHead frm.Name, "lblHeadID", "ID", 240, 700
+    ListHead frm.Name, "lblHeadPayee", "Payee", 940, 4600
+    ListHead frm.Name, "lblHeadType", "Type", 5540, 1100
+    ListHead frm.Name, "lblHeadAbbrev", "Abbrev", 6640, 1300
+    ListHead frm.Name, "lblHeadSAP", "SAP ID", 7940, 1900
+    ListHead frm.Name, "lblHeadBSS", "BSS ID", 9840, 1500
+    ListHead frm.Name, "lblHeadStatus", "Status", 11340, 1400
+    Set ctl = AddControl(frm.Name, acForm, acListBox, acDetail, "lstPayees", 240, 300, 14320, 2460)
     ctl.ColumnCount = 7
-    ctl.ColumnHeads = True
+    ctl.ColumnHeads = False
     ctl.ColumnWidths = "700;4600;1100;1300;1900;1500;1400"
     ctl.BoundColumn = 1
-    EMSSavePayeeList False
-    ctl.RowSource = "qryPayeeList"
+    ctl.RowSourceType = "EMSPayeeList"
+    ctl.RowSource = ""
     ctl.OnClick = "=EMSPayeePick()"
     ctl.OnDblClick = "=EMSPayeeEdit()"
     ctl.BackColor = vbWhite
@@ -567,6 +576,13 @@ Private Sub LabelForm(ByVal formName As String, ByVal controlName As String, ByV
     Set ctl = AddControl(formName, acForm, acLabel, acHeader, controlName, x, y, width, height)
     ctl.Caption = caption
     Paint ctl, size, bold
+End Sub
+
+Private Sub ListHead(ByVal formName As String, ByVal controlName As String, ByVal caption As String, ByVal x As Long, ByVal width As Long)
+    Dim ctl As Control
+    Set ctl = AddControl(formName, acForm, acLabel, acDetail, controlName, x, 40, width, 240)
+    ctl.Caption = caption
+    Paint ctl, 9, True
 End Sub
 
 Private Sub LabelDetail(ByVal formName As String, ByVal controlName As String, ByVal caption As String, ByVal x As Long, ByVal y As Long, ByVal width As Long, ByVal height As Long, ByVal size As Single, ByVal bold As Boolean)
