@@ -598,7 +598,7 @@ Private Function LinkSubform(ByVal formName As String, ByVal controlName As Stri
             ctl.LinkChildFields = "EventID"
         End If
     End If
-End Sub
+End Function
 
 Private Sub DatasheetBox(ByVal formName As String, ByVal fieldName As String, ByVal caption As String, ByVal width As Long)
     DatasheetControl formName, acTextBox, fieldName, caption, width, "", "", 1, ""
