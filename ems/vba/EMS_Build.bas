@@ -138,32 +138,85 @@ End Sub
 
 Private Sub BuildPayee()
     Dim frm As Form
+    Dim ctl As Control
     Set frm = CreateForm()
     frm.Caption = "Payees"
     frm.RecordSource = "tblPayee"
-    frm.Width = 14000
+    frm.Width = 14800
+    frm.RecordSelectors = False
+    frm.NavigationButtons = True
+    frm.ScrollBars = 2
+    frm.OnCurrent = "=EMSPayeeCurrent()"
     EnsureFormHeader frm.Name
-    frm.Section(acHeader).Height = 700
-    ButtonForm frm.Name, "cmdEvents", "Events", "=EMSBackToEvents()", 200, 160, 1400, 360
-    ButtonForm frm.Name, "cmdNew", "New payee", "=GoToNewPayee()", 1800, 160, 1600, 360
-    BoundBox frm.Name, "PayeeID", "", 0, 0, 10, 10, False
-    BoundBox frm.Name, "PayeeName", "Payee", 200, 40, 5000, 280, True
-    BoundBox frm.Name, "PayeeType", "Type", 5400, 40, 1200, 280, True
-    BoundBox frm.Name, "Abbreviation", "Abbrev", 6800, 40, 1400, 280, True
-    BoundBox frm.Name, "Active", "Active", 8400, 40, 800, 280, True
-    BoundBox frm.Name, "SAPID", "SAP", 200, 420, 1800, 280, True
-    BoundBox frm.Name, "BSSID", "BSS", 2200, 420, 1800, 280, True
-    BoundBox frm.Name, "Address1", "Address", 4200, 420, 4500, 280, True
-    BoundBox frm.Name, "Address2", "City", 8900, 420, 4500, 280, True
-    BoundBox frm.Name, "Notes", "Notes", 200, 800, 8000, 360, True
-    LinkSubform frm.Name, "fsubEmail", "fsubEmail", 200, 1400, 6400, 2200
-    LinkSubform frm.Name, "fsubRate", "fsubRate", 6800, 1400, 6800, 2200
-    frm.Section(acDetail).Height = 3800
+    frm.Section(acHeader).Height = 640
+    frm.Section(acHeader).BackColor = RGB(255, 255, 255)
+    frm.Section(acDetail).BackColor = RGB(255, 255, 255)
+    LabelForm frm.Name, "lblTitle", "Payees", 240, 140, 2200, 400, 20, True
+    Set ctl = AddControl(frm.Name, acForm, acCheckBox, acHeader, "chkShowInactive", 2800, 200, 280, 280)
+    ctl.DefaultValue = "False"
+    ctl.OnClick = "=EMSPayeeFilter()"
+    LabelForm frm.Name, "lblInactive", "Show inactive", 3160, 200, 2200, 280, 10, False
+    ButtonForm frm.Name, "cmdEvents", "Events", "=EMSBackToEvents()", 10800, 140, 1600, 400
+    ButtonForm frm.Name, "cmdNew", "New payee", "=GoToNewPayee()", 12600, 140, 1800, 400
+    Set ctl = AddControl(frm.Name, acForm, acListBox, acDetail, "lstPayees", 240, 80, 14320, 2680)
+    ctl.ColumnCount = 7
+    ctl.ColumnHeads = True
+    ctl.ColumnWidths = "700;4600;1100;1300;1900;1500;1400"
+    ctl.BoundColumn = 1
+    ctl.RowSource = "SELECT PayeeID AS [ID], PayeeName AS [Payee], PayeeType AS [Type], Abbreviation AS [Abbrev], SAPID AS [SAP ID], BSSID AS [BSS ID], IIf(Active<>0,'Active','Inactive') AS [Status] FROM tblPayee WHERE Active<>0 ORDER BY PayeeName"
+    ctl.OnClick = "=EMSPayeePick()"
+    ctl.OnDblClick = "=EMSPayeeEdit()"
+    Paint ctl, 10, False
+    ButtonFormDetail frm.Name, "cmdEdit", "Edit", "=EMSPayeeEdit()", 240, 3080, 1500, 400
+    ButtonFormDetail frm.Name, "cmdSave", "Save", "=EMSPayeeSave()", 1860, 3080, 1500, 400
+    ButtonFormDetail frm.Name, "cmdCancel", "Cancel", "=EMSPayeeCancel()", 3480, 3080, 1500, 400
+    LabelDetail frm.Name, "lblSelected", "Selected payee", 240, 3600, 4000, 300, 14, True
+    PayeeField frm.Name, "txtPayeeName", "PayeeName", "Payee name", 240, 3980, 6200, False
+    PayeeCombo frm.Name, "cboType", "PayeeType", "Type", 6600, 3980, 1500, "NPO;SUB"
+    PayeeField frm.Name, "txtAbbreviation", "Abbreviation", "Abbreviation", 8260, 3980, 2000, False
+    Set ctl = AddControl(frm.Name, acForm, acCheckBox, acDetail, "chkActive", 10520, 4220, 300, 300)
+    ctl.ControlSource = "Active"
+    ctl.DefaultValue = "True"
+    LabelDetail frm.Name, "lblActive", "Active", 10900, 4220, 1400, 300, 11, False
+    PayeeField frm.Name, "txtSAPID", "SAPID", "SAP ID", 240, 4740, 2200, False
+    PayeeField frm.Name, "txtBSSID", "BSSID", "BSS ID", 2600, 4740, 2200, False
+    PayeeField frm.Name, "txtAddress1", "Address1", "Address", 4960, 4740, 4600, False
+    PayeeField frm.Name, "txtAddress2", "Address2", "City, state, ZIP", 9720, 4740, 4840, False
+    PayeeField frm.Name, "txtNotes", "Notes", "Notes", 240, 5520, 14320, True
+    LabelDetail frm.Name, "lblEmails", "Emails", 240, 6560, 3000, 280, 12, True
+    LabelDetail frm.Name, "lblRates", "Commission rates", 7600, 6560, 4000, 280, 12, True
+    LabelDetail frm.Name, "lblRateHint", "Add a row when a rate changes. Leave Ends blank while it is current.", 7600, 6860, 6800, 240, 9, False
+    Set ctl = LinkSubform(frm.Name, "fsubEmail", "fsubEmail", 240, 7280, 7000, 2200)
+    ctl.BorderStyle = 1
+    Set ctl = LinkSubform(frm.Name, "fsubRate", "fsubRate", 7600, 7280, 6960, 2200)
+    ctl.BorderStyle = 1
+    LabelDetail frm.Name, "lblStatus", "Select a payee in the list. Edit unlocks the fields.", 240, 9600, 14320, 280, 10, False
+    frm.Section(acDetail).Height = 10000
     SaveObject acForm, frm.Name, "frmPayee"
+End Sub
+
+Public Sub BuildPayeeScreen()
+    On Error GoTo Failed
+    DoCmd.Hourglass True
+    CloseOpenDesign
+    DropObject acForm, "frmPayee"
+    DropObject acForm, "fsubEmail"
+    DropObject acForm, "fsubRate"
+    BuildEmail
+    BuildRate
+    BuildPayee
+    DoCmd.Hourglass False
+    DoCmd.OpenForm "frmPayee"
+    Exit Sub
+Failed:
+    DoCmd.Hourglass False
+    CloseOpenDesign
+    MsgBox "Build stopped." & vbCrLf & Err.Description, vbCritical
 End Sub
 
 Public Function GoToNewPayee()
     DoCmd.GoToRecord acDataForm, "frmPayee", acNewRec
+    Forms!frmPayee!txtPayeeName.SetFocus
 End Function
 
 Private Sub BuildAssign()
@@ -171,22 +224,22 @@ Private Sub BuildAssign()
     Set frm = CreateForm()
     frm.Caption = "Stands"
     frm.RecordSource = "tblAssign"
-    frm.DefaultView = 2
-    DatasheetBox frm.Name, "LocationName", 2400
-    DatasheetBox frm.Name, "DepartmentName", 1800
-    DatasheetBox frm.Name, "PosSales", 1200
-    DatasheetBox frm.Name, "FoodNet", 1200
-    DatasheetBox frm.Name, "NaNet", 1100
-    DatasheetBox frm.Name, "AlcoholNet", 1200
-    DatasheetBox frm.Name, "PosTips", 1100
-    DatasheetCombo frm.Name, "Role", "Value List", "NPO;SUB;STAFF;OPEN", 1, "1400", 1100
-    DatasheetCombo frm.Name, "PayeeID", "Table/Query", "SELECT PayeeID, PayeeName FROM tblPayee WHERE Active<>0 ORDER BY PayeeName", 2, "0;3600", 2400
-    DatasheetBox frm.Name, "Headcount", 900
-    DatasheetBox frm.Name, "StaffNames", 2200
-    DatasheetBox frm.Name, "CookFee", 1000
-    DatasheetBox frm.Name, "Bonus", 1000
-    DatasheetBox frm.Name, "Shortage", 1000
-    DatasheetBox frm.Name, "Cleaning", 1000
+    UseDatasheet frm
+    DatasheetBox frm.Name, "LocationName", "Stand", 2400
+    DatasheetBox frm.Name, "DepartmentName", "Department", 1800
+    DatasheetBox frm.Name, "PosSales", "POS sales", 1200
+    DatasheetBox frm.Name, "FoodNet", "Food net", 1200
+    DatasheetBox frm.Name, "NaNet", "NA net", 1100
+    DatasheetBox frm.Name, "AlcoholNet", "Alcohol net", 1200
+    DatasheetBox frm.Name, "PosTips", "Tips", 1100
+    DatasheetCombo frm.Name, "Role", "Value List", "NPO;SUB;STAFF;OPEN", 1, "1400", "Role", 1100
+    DatasheetCombo frm.Name, "PayeeID", "Table/Query", "SELECT PayeeID, PayeeName FROM tblPayee WHERE Active<>0 ORDER BY PayeeName", 2, "0;3600", "Payee", 2800
+    DatasheetBox frm.Name, "Headcount", "People", 900
+    DatasheetBox frm.Name, "StaffNames", "Staff names", 2400
+    DatasheetBox frm.Name, "CookFee", "Cook fee", 1000
+    DatasheetBox frm.Name, "Bonus", "Bonus", 1000
+    DatasheetBox frm.Name, "Shortage", "Shortage", 1000
+    DatasheetBox frm.Name, "Cleaning", "Cleaning", 1100
     SaveObject acForm, frm.Name, "fsubAssign"
 End Sub
 
@@ -195,15 +248,15 @@ Private Sub BuildVendor()
     Set frm = CreateForm()
     frm.Caption = "Vendor tenders and ice"
     frm.RecordSource = "tblVendorInput"
-    frm.DefaultView = 2
-    DatasheetCombo frm.Name, "PayeeID", "Table/Query", "SELECT PayeeID, PayeeName FROM tblPayee WHERE PayeeType='SUB' AND Active<>0 ORDER BY PayeeName", 2, "0;3600", 2400
-    DatasheetBox frm.Name, "CashTender", 1200
-    DatasheetBox frm.Name, "CardTender", 1200
-    DatasheetBox frm.Name, "CorporateVoucher", 1400
-    DatasheetBox frm.Name, "LevyNfpVoucher", 1400
-    DatasheetBox frm.Name, "UnmGuestVoucher", 1400
-    DatasheetBox frm.Name, "IceBags", 1000
-    DatasheetBox frm.Name, "OtherExpense", 1200
+    UseDatasheet frm
+    DatasheetCombo frm.Name, "PayeeID", "Table/Query", "SELECT PayeeID, PayeeName FROM tblPayee WHERE PayeeType='SUB' AND Active<>0 ORDER BY PayeeName", 2, "0;3600", "Vendor", 2800
+    DatasheetBox frm.Name, "CashTender", "Cash", 1200
+    DatasheetBox frm.Name, "CardTender", "Cards", 1200
+    DatasheetBox frm.Name, "CorporateVoucher", "Corporate voucher", 1800
+    DatasheetBox frm.Name, "LevyNfpVoucher", "Levy voucher", 1600
+    DatasheetBox frm.Name, "UnmGuestVoucher", "UNM voucher", 1600
+    DatasheetBox frm.Name, "IceBags", "Ice bags", 1100
+    DatasheetBox frm.Name, "OtherExpense", "Other", 1200
     SaveObject acForm, frm.Name, "fsubVendor"
 End Sub
 
@@ -212,11 +265,11 @@ Private Sub BuildSupplement()
     Set frm = CreateForm()
     frm.Caption = "Supplements"
     frm.RecordSource = "tblSupplement"
-    frm.DefaultView = 2
-    DatasheetCombo frm.Name, "PayeeID", "Table/Query", "SELECT PayeeID, Abbreviation FROM tblPayee WHERE Active<>0 ORDER BY Abbreviation", 2, "0;1400", 1200
-    DatasheetBox frm.Name, "Label", 2200
-    DatasheetBox frm.Name, "Amount", 1200
-    DatasheetBox frm.Name, "GLCode", 1000
+    UseDatasheet frm
+    DatasheetCombo frm.Name, "PayeeID", "Table/Query", "SELECT PayeeID, Abbreviation FROM tblPayee WHERE Active<>0 ORDER BY Abbreviation", 2, "0;1400", "Payee", 1400
+    DatasheetBox frm.Name, "Label", "Label", 2400
+    DatasheetBox frm.Name, "Amount", "Amount", 1200
+    DatasheetBox frm.Name, "GLCode", "GL", 1200
     SaveObject acForm, frm.Name, "fsubSupplement"
 End Sub
 
@@ -225,16 +278,16 @@ Private Sub BuildStaff()
     Set frm = CreateForm()
     frm.Caption = "Staff tips"
     frm.RecordSource = "tblStaffTip"
-    frm.DefaultView = 2
+    UseDatasheet frm
     frm.AllowAdditions = False
     frm.AllowEdits = False
     frm.AllowDeletions = False
-    DatasheetBox frm.Name, "LocationName", 2800
-    DatasheetBox frm.Name, "SlotNo", 700
-    DatasheetBox frm.Name, "PersonName", 1800
-    DatasheetBox frm.Name, "Amount", 1100
-    DatasheetBox frm.Name, "PoolAmount", 1200
-    DatasheetBox frm.Name, "HeldBack", 1100
+    DatasheetBox frm.Name, "LocationName", "Stand", 2800
+    DatasheetBox frm.Name, "SlotNo", "#", 700
+    DatasheetBox frm.Name, "PersonName", "Person", 1800
+    DatasheetBox frm.Name, "Amount", "Amount", 1100
+    DatasheetBox frm.Name, "PoolAmount", "Pool", 1200
+    DatasheetBox frm.Name, "HeldBack", "Held", 1100
     SaveObject acForm, frm.Name, "fsubStaff"
 End Sub
 
@@ -243,10 +296,10 @@ Private Sub BuildEmail()
     Set frm = CreateForm()
     frm.Caption = "Emails"
     frm.RecordSource = "tblPayeeEmail"
-    frm.DefaultView = 2
-    DatasheetBox frm.Name, "EmailAddress", 3200
-    DatasheetBox frm.Name, "Label", 1200
-    DatasheetBox frm.Name, "IsPrimary", 900
+    UseDatasheet frm
+    DatasheetBox frm.Name, "EmailAddress", "Email", 4200
+    DatasheetBox frm.Name, "Label", "Label", 1600
+    DatasheetCheck frm.Name, "IsPrimary", "Primary", 1000
     SaveObject acForm, frm.Name, "fsubEmail"
 End Sub
 
@@ -255,12 +308,12 @@ Private Sub BuildRate()
     Set frm = CreateForm()
     frm.Caption = "Rates"
     frm.RecordSource = "tblPayeeRate"
-    frm.DefaultView = 2
-    DatasheetBox frm.Name, "RateCode", 1800
-    DatasheetBox frm.Name, "RateAmount", 1100
-    DatasheetBox frm.Name, "EffectiveDate", 1400
-    DatasheetBox frm.Name, "EndDate", 1400
-    DatasheetBox frm.Name, "Notes", 2200
+    UseDatasheet frm
+    DatasheetBox frm.Name, "RateCode", "Rate", 2400
+    DatasheetBox frm.Name, "RateAmount", "Amount", 1200
+    DatasheetBox frm.Name, "EffectiveDate", "Starts", 1400
+    DatasheetBox frm.Name, "EndDate", "Ends", 1400
+    DatasheetBox frm.Name, "Notes", "Notes", 2200
     SaveObject acForm, frm.Name, "fsubRate"
 End Sub
 
@@ -460,12 +513,45 @@ Private Sub Paint(ByVal ctl As Control, ByVal size As Single, ByVal bold As Bool
 End Sub
 
 Private Function ButtonForm(ByVal formName As String, ByVal controlName As String, ByVal caption As String, ByVal onClick As String, ByVal x As Long, ByVal y As Long, ByVal width As Long, ByVal height As Long) As Control
-    If height = 0 Then Exit Function
-    Set ButtonForm = AddControl(formName, acForm, acCommandButton, acHeader, controlName, x, y, width, height)
-    ButtonForm.Caption = caption
-    ButtonForm.OnClick = onClick
-    Paint ButtonForm, 9, False
+    Set ButtonForm = PlaceButton(formName, controlName, caption, onClick, acHeader, x, y, width, height)
 End Function
+
+Private Function ButtonFormDetail(ByVal formName As String, ByVal controlName As String, ByVal caption As String, ByVal onClick As String, ByVal x As Long, ByVal y As Long, ByVal width As Long, ByVal height As Long) As Control
+    Set ButtonFormDetail = PlaceButton(formName, controlName, caption, onClick, acDetail, x, y, width, height)
+End Function
+
+Private Function PlaceButton(ByVal formName As String, ByVal controlName As String, ByVal caption As String, ByVal onClick As String, ByVal section As Long, ByVal x As Long, ByVal y As Long, ByVal width As Long, ByVal height As Long) As Control
+    Set PlaceButton = AddControl(formName, acForm, acCommandButton, section, controlName, x, y, width, height)
+    PlaceButton.Caption = caption
+    PlaceButton.OnClick = onClick
+    Paint PlaceButton, 10, False
+End Function
+
+Private Sub PayeeField(ByVal formName As String, ByVal controlName As String, ByVal fieldName As String, ByVal caption As String, ByVal x As Long, ByVal y As Long, ByVal width As Long, ByVal tall As Boolean)
+    Dim ctl As Control
+    Dim boxHeight As Long
+    boxHeight = IIf(tall, 560, 340)
+    LabelDetail formName, "lbl" & controlName, caption, x, y, width, 220, 9, False
+    Set ctl = AddControl(formName, acForm, acTextBox, acDetail, controlName, x, y + 240, width, boxHeight)
+    ctl.ControlSource = fieldName
+    ctl.BorderStyle = 1
+    ctl.BackColor = vbWhite
+    If tall Then ctl.ScrollBars = 2
+    Paint ctl, 11, False
+End Sub
+
+Private Sub PayeeCombo(ByVal formName As String, ByVal controlName As String, ByVal fieldName As String, ByVal caption As String, ByVal x As Long, ByVal y As Long, ByVal width As Long, ByVal list As String)
+    Dim ctl As Control
+    LabelDetail formName, "lbl" & controlName, caption, x, y, width, 220, 9, False
+    Set ctl = AddControl(formName, acForm, acComboBox, acDetail, controlName, x, y + 240, width, 340)
+    ctl.ControlSource = fieldName
+    ctl.RowSourceType = "Value List"
+    ctl.RowSource = list
+    ctl.LimitToList = True
+    ctl.BorderStyle = 1
+    ctl.BackColor = vbWhite
+    Paint ctl, 11, False
+End Sub
 
 Private Sub LabelForm(ByVal formName As String, ByVal controlName As String, ByVal caption As String, ByVal x As Long, ByVal y As Long, ByVal width As Long, ByVal height As Long, ByVal size As Single, ByVal bold As Boolean)
     Dim ctl As Control
@@ -499,9 +585,10 @@ Private Sub BoundBox(ByVal formName As String, ByVal fieldName As String, ByVal 
     If shown Then ctl.BorderStyle = 1
 End Sub
 
-Private Sub LinkSubform(ByVal formName As String, ByVal controlName As String, ByVal source As String, ByVal x As Long, ByVal y As Long, ByVal width As Long, ByVal height As Long)
+Private Function LinkSubform(ByVal formName As String, ByVal controlName As String, ByVal source As String, ByVal x As Long, ByVal y As Long, ByVal width As Long, ByVal height As Long) As Control
     Dim ctl As Control
     Set ctl = AddControl(formName, acForm, acSubform, acDetail, controlName, x, y, width, height)
+    Set LinkSubform = ctl
     ctl.SourceObject = source
     ctl.LinkMasterFields = "PayeeID"
     ctl.LinkChildFields = "PayeeID"
@@ -513,22 +600,73 @@ Private Sub LinkSubform(ByVal formName As String, ByVal controlName As String, B
     End If
 End Sub
 
-Private Sub DatasheetBox(ByVal formName As String, ByVal fieldName As String, ByVal width As Long)
-    Dim ctl As Control
-    Set ctl = AddControl(formName, acForm, acTextBox, acDetail, "txt" & fieldName, 0, 0, width, 300)
-    ctl.ControlSource = fieldName
+Private Sub DatasheetBox(ByVal formName As String, ByVal fieldName As String, ByVal caption As String, ByVal width As Long)
+    DatasheetControl formName, acTextBox, fieldName, caption, width, "", "", 1, ""
 End Sub
 
-Private Sub DatasheetCombo(ByVal formName As String, ByVal fieldName As String, ByVal sourceType As String, ByVal source As String, ByVal columns As Long, ByVal widths As String, ByVal width As Long)
+Private Sub DatasheetCheck(ByVal formName As String, ByVal fieldName As String, ByVal caption As String, ByVal width As Long)
+    DatasheetControl formName, acCheckBox, fieldName, caption, width, "", "", 1, ""
+End Sub
+
+Private Sub DatasheetCombo(ByVal formName As String, ByVal fieldName As String, ByVal sourceType As String, ByVal source As String, ByVal columns As Long, ByVal widths As String, ByVal caption As String, ByVal width As Long)
+    DatasheetControl formName, acComboBox, fieldName, caption, width, sourceType, source, columns, widths
+End Sub
+
+' The column title in a datasheet is the attached label. AddControl removes that label,
+' which is why the grid was showing names like txtEmailAddress.
+Private Sub DatasheetControl(ByVal formName As String, ByVal controlKind As Long, ByVal fieldName As String, ByVal caption As String, ByVal width As Long, ByVal sourceType As String, ByVal source As String, ByVal columns As Long, ByVal widths As String)
+    Dim host As Object
     Dim ctl As Control
-    Set ctl = AddControl(formName, acForm, acComboBox, acDetail, "cbo" & fieldName, 0, 0, width, 300)
+    Dim before As Long
+    Dim index As Long
+    Dim kept As String
+    Set host = Forms(formName)
+    before = host.Controls.Count
+    Set ctl = CreateControl(formName, controlKind, acDetail, "", fieldName, 0, 0, width, 300)
+    kept = "col" & fieldName
+    ctl.Name = kept
     ctl.ControlSource = fieldName
-    ctl.RowSourceType = sourceType
-    ctl.RowSource = source
-    ctl.ColumnCount = columns
-    ctl.ColumnWidths = widths
-    ctl.BoundColumn = 1
-    ctl.LimitToList = True
+    On Error Resume Next
+    ctl.ColumnWidth = width
+    ctl.ColumnHidden = False
+    On Error GoTo 0
+    If controlKind = acComboBox Then
+        ctl.RowSourceType = sourceType
+        ctl.RowSource = source
+        ctl.ColumnCount = columns
+        ctl.ColumnWidths = widths
+        ctl.BoundColumn = 1
+        ctl.LimitToList = True
+    End If
+    If InStr(fieldName, "Date") > 0 Then ctl.Format = "Short Date"
+    If fieldName = "RateAmount" Then ctl.Format = "0.00####"
+    For index = host.Controls.Count - 1 To before Step -1
+        If host.Controls(index).Name <> kept Then
+            host.Controls(index).Caption = caption
+            host.Controls(index).Name = "lbl" & fieldName
+            Exit Sub
+        End If
+    Next index
+    ctl.Name = ColumnToken(caption, fieldName)
+End Sub
+
+Private Function ColumnToken(ByVal caption As String, ByVal fieldName As String) As String
+    Dim result As String
+    Dim index As Long
+    Dim ch As String
+    result = ""
+    For index = 1 To Len(caption)
+        ch = Mid$(caption, index, 1)
+        If (ch >= "A" And ch <= "Z") Or (ch >= "a" And ch <= "z") Or (ch >= "0" And ch <= "9") Then result = result & ch
+    Next index
+    If Len(result) = 0 Then result = "col" & fieldName
+    ColumnToken = result
+End Function
+
+Private Sub UseDatasheet(ByVal frm As Form)
+    frm.DefaultView = 2
+    frm.DatasheetFontName = "Calibri"
+    frm.DatasheetFontHeight = 10
 End Sub
 
 Private Sub TitleLabel(ByVal reportName As String, ByVal controlName As String, ByVal caption As String, ByVal y As Long, ByVal size As Single)

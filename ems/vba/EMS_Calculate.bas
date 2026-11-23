@@ -413,10 +413,112 @@ Public Function EMSOpenSelected()
 End Function
 
 Public Function EMSBackToEvents()
+    On Error Resume Next
+    DoCmd.Close acForm, "frmPayee"
     DoCmd.Close acForm, "frmEvent"
+    On Error GoTo 0
     If Not CurrentProject.AllForms("frmHub").IsLoaded Then DoCmd.OpenForm "frmHub"
     EMSHubSearch
 End Function
+
+Public Function EMSPayeeCurrent()
+    Dim frm As Object
+    Set frm = Forms!frmPayee
+    If IsNull(frm!PayeeID) Then
+        frm!lstPayees = Null
+        EMSPayeeLock False
+        frm!lblStatus.Caption = "New payee. Enter the name, then Save."
+    Else
+        frm!lstPayees = frm!PayeeID
+        EMSPayeeLock True
+        frm!lblStatus.Caption = "Viewing " & Nz(frm!txtPayeeName, "this payee") & ". Choose Edit to change it."
+    End If
+End Function
+
+Public Function EMSPayeePick()
+    Dim frm As Object
+    Dim id As Long
+    Set frm = Forms!frmPayee
+    id = CLng(Nz(frm!lstPayees, 0))
+    If id = 0 Then Exit Function
+    If frm.NewRecord And Len(Trim$(Nz(frm!txtPayeeName, ""))) = 0 Then
+        frm.Undo
+    ElseIf Len(Trim$(Nz(frm!txtPayeeName, ""))) = 0 Then
+        MsgBox "Enter the payee name before leaving this record.", vbExclamation
+        Exit Function
+    ElseIf frm.Dirty Then
+        frm.Dirty = False
+    End If
+    DoCmd.SearchForRecord acDataForm, "frmPayee", acFirst, "PayeeID=" & id
+End Function
+
+Public Function EMSPayeeEdit()
+    Dim frm As Object
+    Set frm = Forms!frmPayee
+    If IsNull(frm!PayeeID) Then Exit Function
+    EMSPayeeLock False
+    frm!txtPayeeName.SetFocus
+    frm!lblStatus.Caption = "Editing " & frm!txtPayeeName & ". Save keeps the changes."
+End Function
+
+Public Function EMSPayeeSave()
+    Dim frm As Object
+    Set frm = Forms!frmPayee
+    If Len(Trim$(Nz(frm!txtPayeeName, ""))) = 0 Then
+        MsgBox "Enter the payee name.", vbExclamation
+        Exit Function
+    End If
+    If frm.Dirty Then frm.Dirty = False
+    If Not Nz(frm!chkActive, False) Then frm!chkShowInactive = True
+    EMSPayeeFilter
+    EMSPayeeLock True
+    frm!lblStatus.Caption = "Saved " & frm!txtPayeeName & "."
+End Function
+
+Public Function EMSPayeeCancel()
+    Dim frm As Object
+    Set frm = Forms!frmPayee
+    On Error Resume Next
+    frm.Undo
+    On Error GoTo 0
+    If frm.NewRecord Then
+        EMSPayeeLock False
+        frm!lblStatus.Caption = "New payee. Enter the name, then Save."
+    Else
+        EMSPayeeLock True
+        frm!lblStatus.Caption = "Changes discarded."
+    End If
+End Function
+
+Public Function EMSPayeeFilter()
+    Dim frm As Object
+    Dim sql As String
+    Set frm = Forms!frmPayee
+    sql = "SELECT PayeeID AS [ID], PayeeName AS [Payee], PayeeType AS [Type], Abbreviation AS [Abbrev], SAPID AS [SAP ID], BSSID AS [BSS ID], IIf(Active<>0,'Active','Inactive') AS [Status] FROM tblPayee"
+    If Not Nz(frm!chkShowInactive, False) Then sql = sql & " WHERE Active<>0"
+    frm!lstPayees.RowSource = sql & " ORDER BY PayeeName"
+    If Not IsNull(frm!PayeeID) Then frm!lstPayees = frm!PayeeID
+End Function
+
+Private Sub EMSPayeeLock(ByVal locked As Boolean)
+    Dim frm As Object
+    Dim name As Variant
+    Set frm = Forms!frmPayee
+    For Each name In Array("txtPayeeName", "cboType", "txtAbbreviation", "chkActive", "txtSAPID", "txtBSSID", "txtAddress1", "txtAddress2", "txtNotes")
+        frm.Controls(CStr(name)).Locked = locked
+    Next name
+    frm!cmdEdit.Enabled = locked And Not frm.NewRecord
+    frm!cmdSave.Enabled = Not locked
+    frm!cmdCancel.Enabled = Not locked
+    On Error Resume Next
+    frm!fsubEmail.Form.AllowEdits = Not locked
+    frm!fsubEmail.Form.AllowAdditions = Not locked
+    frm!fsubEmail.Form.AllowDeletions = Not locked
+    frm!fsubRate.Form.AllowEdits = Not locked
+    frm!fsubRate.Form.AllowAdditions = Not locked
+    frm!fsubRate.Form.AllowDeletions = Not locked
+    On Error GoTo 0
+End Sub
 
 Public Function EMSOpenPayees()
     Dim added As Long
