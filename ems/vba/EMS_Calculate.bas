@@ -4,6 +4,8 @@ Option Explicit
 
 Private payeeRows As Variant
 Private payeeCount As Long
+Private payeeSelecting As Boolean
+Private pendingPayeeId As Long
 
 ' A blank staff headcount holds only that stand's tips. Donation and vendor
 ' checks still calculate. A new event can be typed with no MyVenue file;
@@ -456,11 +458,12 @@ Public Function EMSPayeeCurrent()
     Dim frm As Object
     Set frm = Forms!frmPayee
     If IsNull(frm!PayeeID) Then
-        frm!lstPayees = Null
+        If Not payeeSelecting Then frm!lstPayees = Null
         EMSPayeeLock False
         frm!lblStatus.Caption = "New payee. Enter the name, then Save."
     Else
-        frm!lstPayees = frm!PayeeID
+        ' Assigning the list here, while the click is still finishing, clears the highlight.
+        If Not payeeSelecting Then EMSPayeeShowRow CLng(frm!PayeeID), False
         EMSPayeeLock True
         frm!lblStatus.Caption = "Viewing " & Nz(frm!txtPayeeName, "this payee") & ". Choose Edit to change it."
     End If
@@ -480,13 +483,45 @@ Public Function EMSPayeePick()
     ElseIf frm.Dirty Then
         frm.Dirty = False
     End If
+    pendingPayeeId = id
+    payeeSelecting = True
     DoCmd.SearchForRecord acDataForm, "frmPayee", acFirst, "PayeeID=" & id
+    payeeSelecting = False
+    ' The record change moves the cursor off the list, so the row highlight vanishes.
+    ' Put it back after Access finishes the click.
+    frm.OnTimer = "=EMSPayeeListFocus()"
+    frm.TimerInterval = 100
 End Function
+
+Public Function EMSPayeeListFocus()
+    Dim frm As Object
+    Set frm = Forms!frmPayee
+    frm.TimerInterval = 0
+    If pendingPayeeId = 0 Then Exit Function
+    EMSPayeeShowRow pendingPayeeId, True
+End Function
+
+Private Sub EMSPayeeShowRow(ByVal id As Long, ByVal takeFocus As Boolean)
+    Dim frm As Object
+    Dim row As Long
+    Set frm = Forms!frmPayee
+    On Error Resume Next
+    If CLng(Nz(frm!lstPayees, 0)) <> id Then frm!lstPayees = id
+    For row = 0 To frm!lstPayees.ListCount - 1
+        If CLng(Nz(frm!lstPayees.Column(0, row), 0)) = id Then
+            frm!lstPayees.Selected(row) = True
+            Exit For
+        End If
+    Next row
+    If takeFocus Then frm!lstPayees.SetFocus
+    On Error GoTo 0
+End Sub
 
 Public Function EMSPayeeEdit()
     Dim frm As Object
     Set frm = Forms!frmPayee
     If IsNull(frm!PayeeID) Then Exit Function
+    frm.TimerInterval = 0
     EMSPayeeLock False
     frm!txtPayeeName.SetFocus
     frm!lblStatus.Caption = "Editing " & frm!txtPayeeName & ". Save keeps the changes."
@@ -525,7 +560,7 @@ Public Function EMSPayeeFilter()
     Dim frm As Object
     Set frm = Forms!frmPayee
     frm!lstPayees.Requery
-    If Not IsNull(frm!PayeeID) Then frm!lstPayees = frm!PayeeID
+    If Not IsNull(frm!PayeeID) Then EMSPayeeShowRow CLng(frm!PayeeID), False
 End Function
 
 ' Adds any payee columns this screen expects. A missing name is what made Access ask for SAPID.
