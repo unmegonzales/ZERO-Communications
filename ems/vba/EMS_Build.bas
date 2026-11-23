@@ -102,38 +102,66 @@ Private Sub BuildEvent()
     BoundBox frm.Name, "EventDate", "Event date", 200, 40, 1600, 280, True
     BoundBox frm.Name, "EventName", "Event", 2000, 40, 5200, 280, True
     BoundBox frm.Name, "EventType", "Type", 7400, 40, 2400, 280, True
-    BoundBox frm.Name, "StatusText", "Status", 10000, 40, 1600, 280, True
     BoundBox frm.Name, "Venue", "Venue", 200, 420, 4000, 280, True
     BoundBox frm.Name, "MinimumCommission", "Minimum commission", 4400, 420, 1800, 280, True
-    BoundBox frm.Name, "PreparedBy", "Prepared by", 200, 800, 2400, 260, True
-    BoundBox frm.Name, "ReviewedBy", "Reviewed by", 2800, 800, 2400, 260, True
-    BoundBox frm.Name, "ApprovedBy", "Approved by", 5400, 800, 2400, 260, True
-    BoundBox frm.Name, "PreparedDate", "Prepared", 8000, 800, 1500, 260, True
-    BoundBox frm.Name, "ReviewedDate", "Reviewed", 9700, 800, 1500, 260, True
-    BoundBox frm.Name, "ApprovedDate", "Approved", 11400, 800, 1500, 260, True
-    BoundBox frm.Name, "Notes", "Notes", 200, 1160, 9000, 460, True
-    Set ctl = AddControl(frm.Name, acForm, acTextBox, acDetail, "txtDue", 9400, 1340, 2800, 320)
+    BoundBox frm.Name, "Notes", "Notes", 200, 800, 9000, 460, True
+    Set ctl = AddControl(frm.Name, acForm, acTextBox, acDetail, "txtDue", 9400, 980, 2800, 320)
     ctl.ControlSource = "=Nz(DSum('AmountDue','tblInvoice','EventID=' & Nz([EventID],0)),0)"
     ctl.Format = "Currency"
     ctl.FontBold = True
-    LabelDetail frm.Name, "lblDue", "Amount due", 9400, 1160, 2000, 180, 8, True
-    LabelDetail frm.Name, "lblHow", "Add a stand in the grid when there is no file, and type its nets. Import fills those nets from the price report. A blank people count holds only that stand's tips.", 200, 1760, 15000, 240, 9, False
-    LinkSubform frm.Name, "fsubAssign", "fsubAssign", 120, 2060, 15800, 2500
-    LinkSubform frm.Name, "fsubVendor", "fsubVendor", 120, 4660, 15800, 1200
-    LinkSubform frm.Name, "fsubSupplement", "fsubSupplement", 120, 5960, 7800, 1100
-    LinkSubform frm.Name, "fsubStaff", "fsubStaff", 8100, 5960, 7800, 1100
-    Set ctl = AddControl(frm.Name, acForm, acListBox, acDetail, "lstInvoices", 120, 7180, 7800, 1300)
+    LabelDetail frm.Name, "lblDue", "Amount due", 9400, 800, 2000, 180, 8, True
+    LabelDetail frm.Name, "lblHow", "Add a stand in the grid when there is no file, and type its nets. Import fills those nets from the price report. A blank people count holds only that stand's tips.", 200, 1400, 15000, 240, 9, False
+    LinkSubform frm.Name, "fsubAssign", "fsubAssign", 120, 1700, 15800, 2500
+    LinkSubform frm.Name, "fsubVendor", "fsubVendor", 120, 4300, 15800, 1200
+    LinkSubform frm.Name, "fsubSupplement", "fsubSupplement", 120, 5600, 7800, 1100
+    LinkSubform frm.Name, "fsubStaff", "fsubStaff", 8100, 5600, 7800, 1100
+    Set ctl = AddControl(frm.Name, acForm, acListBox, acDetail, "lstInvoices", 120, 6820, 7800, 1300)
     ctl.RowSource = "SELECT i.InvoiceID, p.Abbreviation, i.InvoiceNumber, i.AmountDue FROM tblInvoice AS i INNER JOIN tblPayee AS p ON i.PayeeID=p.PayeeID WHERE i.EventID=[Forms]![frmEvent]![EventID] ORDER BY p.Abbreviation"
     ctl.ColumnCount = 4
     ctl.ColumnWidths = "0;1200;3200;1600"
     ctl.BoundColumn = 1
     ctl.OnDblClick = "=EMSPreviewCurrent()"
-    Set ctl = AddControl(frm.Name, acForm, acListBox, acDetail, "lstExceptions", 8100, 7180, 7800, 1300)
+    Set ctl = AddControl(frm.Name, acForm, acListBox, acDetail, "lstExceptions", 8100, 6820, 7800, 1300)
     ctl.RowSource = "SELECT Kind, Detail FROM tblException WHERE EventID=[Forms]![frmEvent]![EventID] ORDER BY ExceptionID"
     ctl.ColumnCount = 2
     ctl.ColumnWidths = "1600;6000"
-    frm.Section(acDetail).Height = 8600
+    frm.Section(acDetail).Height = 8240
     SaveObject acForm, frm.Name, "frmEvent"
+End Sub
+
+' Removes the status and signature columns from the event table. The statement still prints the office names, dated with the event.
+Public Sub TrimEventFields()
+    On Error GoTo Failed
+    DoCmd.Hourglass True
+    CloseOpenDesign
+    On Error Resume Next
+    DoCmd.Close acTable, "tblEvent", acSaveNo
+    DropEventColumn "StatusText"
+    DropEventColumn "PreparedBy"
+    DropEventColumn "PreparedTitle"
+    DropEventColumn "PreparedDate"
+    DropEventColumn "ReviewedBy"
+    DropEventColumn "ReviewedTitle"
+    DropEventColumn "ReviewedDate"
+    DropEventColumn "ApprovedBy"
+    DropEventColumn "ApprovedTitle"
+    DropEventColumn "ApprovedDate"
+    On Error GoTo Failed
+    DropObject acForm, "frmEvent"
+    BuildEvent
+    DoCmd.Hourglass False
+    MsgBox "The extra event columns are removed. Payout statements still print the office names, and those dates are the event date.", vbInformation
+    Exit Sub
+Failed:
+    DoCmd.Hourglass False
+    CloseOpenDesign
+    MsgBox "Could not remove the event columns." & vbCrLf & Err.Description, vbCritical
+End Sub
+
+Private Sub DropEventColumn(ByVal fieldName As String)
+    On Error Resume Next
+    CurrentDb.Execute "ALTER TABLE [tblEvent] DROP COLUMN [" & fieldName & "]"
+    CurrentDb.TableDefs.Refresh
 End Sub
 
 Private Sub BuildPayee()
@@ -459,14 +487,7 @@ Private Sub CaptionFields()
     FieldCaption "tblEvent", "EventDate", "Event date"
     FieldCaption "tblEvent", "EventName", "Event"
     FieldCaption "tblEvent", "EventType", "Type"
-    FieldCaption "tblEvent", "StatusText", "Status"
     FieldCaption "tblEvent", "MinimumCommission", "Minimum commission"
-    FieldCaption "tblEvent", "PreparedBy", "Prepared by"
-    FieldCaption "tblEvent", "ReviewedBy", "Reviewed by"
-    FieldCaption "tblEvent", "ApprovedBy", "Approved by"
-    FieldCaption "tblEvent", "PreparedDate", "Prepared"
-    FieldCaption "tblEvent", "ReviewedDate", "Reviewed"
-    FieldCaption "tblEvent", "ApprovedDate", "Approved"
     FieldCaption "tblAssign", "LocationName", "Stand"
     FieldCaption "tblAssign", "DepartmentName", "Department"
     FieldCaption "tblAssign", "PosSales", "POS sales"

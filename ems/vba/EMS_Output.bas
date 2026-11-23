@@ -170,7 +170,7 @@ Public Sub EMSFillStatement(ByVal invoiceId As Long)
         If misc <> 0 Then InsertGl company, center, 108, "Misc. (to be reclassed)", "673000", misc
     End If
     InsertHead invoice, eventRow, payee, showAdj
-    gPageFooter = CStr(payee!PayeeName) & " | " & CStr(invoice!InvoiceNumber) & " | " & CStr(Nz(eventRow!StatusText, ""))
+    gPageFooter = CStr(payee!PayeeName) & " | " & CStr(invoice!InvoiceNumber)
     lines.Close
     extras.Close
     payee.Close
@@ -212,18 +212,43 @@ End Sub
 
 Private Sub InsertHead(ByVal invoice As Object, ByVal eventRow As Object, ByVal payee As Object, ByVal showAdj As Boolean)
     Dim address As String
+    Dim office As Object
+    Dim prepName As String
+    Dim prepTitle As String
+    Dim revName As String
+    Dim revTitle As String
+    Dim apprName As String
+    Dim apprTitle As String
+    Dim whenText As String
     address = Trim$(CStr(Nz(payee!Address1, "")) & " " & CStr(Nz(payee!Address2, "")))
+    prepName = ""
+    prepTitle = ""
+    revName = ""
+    revTitle = ""
+    apprName = ""
+    apprTitle = ""
+    Set office = CurrentDb.OpenRecordset("SELECT TOP 1 * FROM tblOffice", EMS_SNAPSHOT)
+    If Not office.EOF Then
+        prepName = CStr(Nz(office!PreparedBy, ""))
+        prepTitle = CStr(Nz(office!PreparedTitle, ""))
+        revName = CStr(Nz(office!ReviewedBy, ""))
+        revTitle = CStr(Nz(office!ReviewedTitle, ""))
+        apprName = CStr(Nz(office!ApprovedBy, ""))
+        apprTitle = CStr(Nz(office!ApprovedTitle, ""))
+    End If
+    office.Close
+    whenText = Format$(eventRow!EventDate, "mm/dd/yyyy")
     Exec "INSERT INTO tblPrintHead (Kind, PayeeName, AddressBlock, StatementDate, InvoiceNumber, AmountDue, EventWhen, EventType, Abbreviation, SAPID, BSSID, StatusText, FoodNet, AlcoholNet, GroupNet, GrossSales, Notes, PreparedBy, PreparedTitle, PreparedWhen, ReviewedBy, ReviewedTitle, ReviewedWhen, ApprovedBy, ApprovedTitle, ApprovedWhen, EventWhenShort, FoodRateLabel, AlcoholRateLabel, ShowAdjustments, Extra) VALUES (" & _
         SqlText(CStr(invoice!Kind)) & "," & SqlText(CStr(payee!PayeeName)) & "," & SqlText(Left$(address, 255)) & "," & _
-        SqlText(Format$(eventRow!EventDate, "mm/dd/yyyy")) & "," & SqlText(CStr(invoice!InvoiceNumber)) & "," & SqlText(MoneyText(CCur(invoice!AmountDue))) & "," & _
+        SqlText(whenText) & "," & SqlText(CStr(invoice!InvoiceNumber)) & "," & SqlText(MoneyText(CCur(invoice!AmountDue))) & "," & _
         SqlText(Format$(eventRow!EventDate, "mmm d, yyyy")) & "," & SqlText(CStr(Nz(eventRow!EventType, ""))) & "," & SqlText(CStr(Nz(payee!Abbreviation, ""))) & "," & _
-        SqlText(CStr(Nz(payee!SAPID, ""))) & "," & SqlText(CStr(Nz(payee!BSSID, ""))) & "," & SqlText(CStr(Nz(eventRow!StatusText, ""))) & "," & _
+        SqlText(CStr(Nz(payee!SAPID, ""))) & "," & SqlText(CStr(Nz(payee!BSSID, ""))) & ",''," & _
         SqlText(MoneyText(CCur(invoice!FoodNet))) & "," & SqlText(MoneyText(CCur(invoice!AlcoholNet))) & "," & SqlText(MoneyText(CCur(invoice!GroupNet))) & "," & SqlText(MoneyText(CCur(invoice!GrossSales))) & "," & _
         SqlText(CStr(Nz(eventRow!Notes, ""))) & "," & _
-        SqlText(CStr(Nz(eventRow!PreparedBy, ""))) & "," & SqlText(CStr(Nz(eventRow!PreparedTitle, ""))) & "," & SqlText(DateText(eventRow!PreparedDate)) & "," & _
-        SqlText(CStr(Nz(eventRow!ReviewedBy, ""))) & "," & SqlText(CStr(Nz(eventRow!ReviewedTitle, ""))) & "," & SqlText(DateText(eventRow!ReviewedDate)) & "," & _
-        SqlText(CStr(Nz(eventRow!ApprovedBy, ""))) & "," & SqlText(CStr(Nz(eventRow!ApprovedTitle, ""))) & "," & SqlText(DateText(eventRow!ApprovedDate)) & "," & _
-        SqlText(Format$(eventRow!EventDate, "mm/dd/yyyy")) & "," & SqlText(FoodRateLabel(invoice, eventRow)) & "," & SqlText(AlcoholRateLabel(invoice, eventRow)) & "," & _
+        SqlText(prepName) & "," & SqlText(prepTitle) & "," & SqlText(whenText) & "," & _
+        SqlText(revName) & "," & SqlText(revTitle) & "," & SqlText(whenText) & "," & _
+        SqlText(apprName) & "," & SqlText(apprTitle) & "," & SqlText(whenText) & "," & _
+        SqlText(whenText) & "," & SqlText(FoodRateLabel(invoice, eventRow)) & "," & SqlText(AlcoholRateLabel(invoice, eventRow)) & "," & _
         IIf(showAdj, "-1", "0") & ",'')"
 End Sub
 

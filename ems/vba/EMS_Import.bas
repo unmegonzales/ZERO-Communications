@@ -113,17 +113,10 @@ Private Function ResolveEvent(ByVal eventId As Long, ByVal eventName As String, 
 End Function
 
 Private Function InsertEvent(ByVal eventName As String, ByVal eventDay As Date) As Long
-    Dim office As Object
-    Set office = CurrentDb.OpenRecordset("SELECT TOP 1 * FROM tblOffice", EMS_SNAPSHOT)
-    Exec "INSERT INTO tblEvent (EventDate, EventName, EventType, Venue, TaxRate, MinimumCommission, StatusText, " & _
-        "PreparedBy, PreparedTitle, ReviewedBy, ReviewedTitle, ApprovedBy, ApprovedTitle, Notes, CreatedAt) VALUES (" & _
+    Exec "INSERT INTO tblEvent (EventDate, EventName, EventType, Venue, TaxRate, MinimumCommission, Notes, CreatedAt) VALUES (" & _
         "#" & Format$(eventDay, "mm/dd/yyyy") & "#," & SqlText(Left$(eventName, 200)) & "," & SqlText(GuessType(eventName)) & "," & _
-        SqlText("University of New Mexico") & ",0.07625,200," & SqlText("DRAFT") & "," & _
-        SqlText(Nz(office!PreparedBy, "")) & "," & SqlText(Nz(office!PreparedTitle, "")) & "," & _
-        SqlText(Nz(office!ReviewedBy, "")) & "," & SqlText(Nz(office!ReviewedTitle, "")) & "," & _
-        SqlText(Nz(office!ApprovedBy, "")) & "," & SqlText(Nz(office!ApprovedTitle, "")) & "," & _
-        "''," & "#" & Format$(Now, "mm/dd/yyyy hh:nn:ss") & "#)"
-    office.Close
+        SqlText("University of New Mexico") & ",0.07625,200,''," & _
+        "#" & Format$(Now, "mm/dd/yyyy hh:nn:ss") & "#)"
     InsertEvent = CLng(Scalar("SELECT Max(EventID) FROM tblEvent"))
 End Function
 

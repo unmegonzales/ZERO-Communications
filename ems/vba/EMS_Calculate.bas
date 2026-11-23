@@ -362,27 +362,13 @@ Public Function EMSEventOpen()
 End Function
 
 Private Sub ApplyEventDefaults()
-    Dim office As Object
     With Forms!frmEvent
         If IsNull(!EventDate) Then !EventDate = Date
         If Len(Nz(!EventType, "")) = 0 Then !EventType = "Event"
         If Len(Nz(!Venue, "")) = 0 Then !Venue = "University of New Mexico"
         If Nz(!TaxRate, 0) = 0 Then !TaxRate = 0.07625
         If Nz(!MinimumCommission, 0) = 0 Then !MinimumCommission = 200
-        If Len(Nz(!StatusText, "")) = 0 Then !StatusText = "DRAFT"
     End With
-    Set office = CurrentDb.OpenRecordset("SELECT TOP 1 * FROM tblOffice", EMS_SNAPSHOT)
-    If Not office.EOF Then
-        With Forms!frmEvent
-            If Len(Nz(!PreparedBy, "")) = 0 Then !PreparedBy = office!PreparedBy
-            If Len(Nz(!PreparedTitle, "")) = 0 Then !PreparedTitle = office!PreparedTitle
-            If Len(Nz(!ReviewedBy, "")) = 0 Then !ReviewedBy = office!ReviewedBy
-            If Len(Nz(!ReviewedTitle, "")) = 0 Then !ReviewedTitle = office!ReviewedTitle
-            If Len(Nz(!ApprovedBy, "")) = 0 Then !ApprovedBy = office!ApprovedBy
-            If Len(Nz(!ApprovedTitle, "")) = 0 Then !ApprovedTitle = office!ApprovedTitle
-        End With
-    End If
-    office.Close
 End Sub
 
 Public Sub EMSEventRefresh()
@@ -430,7 +416,6 @@ Public Function EMSHubSearch()
     findText = Trim$(Nz(Forms!frmHub!txtFind, ""))
     If Len(findText) > 0 Then
         sql = sql & " AND (e.EventName Like " & SqlText("%" & findText & "%") & " OR e.EventType Like " & SqlText("%" & findText & "%") & _
-            " OR e.StatusText Like " & SqlText("%" & findText & "%") & _
             " OR e.EventID In (SELECT a.EventID FROM tblAssign AS a WHERE a.LocationName Like " & SqlText("%" & findText & "%") & ")" & _
             " OR e.EventID In (SELECT i.EventID FROM tblInvoice AS i WHERE i.InvoiceNumber Like " & SqlText("%" & findText & "%") & ")" & _
             " OR e.EventID In (SELECT a.EventID FROM tblAssign AS a INNER JOIN tblPayee AS p ON a.PayeeID=p.PayeeID WHERE p.PayeeName Like " & SqlText("%" & findText & "%") & " OR p.Abbreviation Like " & SqlText("%" & findText & "%") & "))"
