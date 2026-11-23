@@ -389,7 +389,7 @@ End Sub
 Public Function EMSHubSearch()
     Dim sql As String
     Dim findText As String
-    sql = "SELECT e.EventID, e.EventDate, e.EventName, e.EventType, (SELECT Nz(Sum(i.AmountDue),0) FROM tblInvoice AS i WHERE i.EventID=e.EventID) AS Due FROM tblEvent AS e WHERE 1=1"
+    sql = "SELECT e.EventID, e.EventDate AS [Date], e.EventName AS [Event], e.EventType AS [Type], (SELECT Nz(Sum(i.AmountDue),0) FROM tblInvoice AS i WHERE i.EventID=e.EventID) AS [Amount due] FROM tblEvent AS e WHERE 1=1"
     If IsDate(Nz(Forms!frmHub!txtFrom, "")) Then sql = sql & " AND e.EventDate>=#" & Format$(CDate(Forms!frmHub!txtFrom), "mm/dd/yyyy") & "#"
     If IsDate(Nz(Forms!frmHub!txtTo, "")) Then sql = sql & " AND e.EventDate<=#" & Format$(CDate(Forms!frmHub!txtTo), "mm/dd/yyyy") & "#"
     findText = Trim$(Nz(Forms!frmHub!txtFind, ""))

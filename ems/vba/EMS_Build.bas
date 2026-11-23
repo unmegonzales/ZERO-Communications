@@ -59,20 +59,22 @@ Private Sub BuildHub()
     frm.Width = 14000
     frm.OnLoad = "=EMSHubSearch()"
     EnsureFormHeader frm.Name
-    frm.Section(acHeader).Height = 1500
-    LabelForm frm.Name, "lblTitle", "Events", 200, 80, 4000, 360, 18, True
-    LabelForm frm.Name, "lblHint", "New event types a settlement with no import. Search covers the date, the event, the payee, the stand, and the invoice.", 200, 480, 11000, 280, 9, False
-    TextForm frm.Name, "txtFrom", 200, 900, 1600, 320, "From"
-    TextForm frm.Name, "txtTo", 2000, 900, 1600, 320, "To"
-    TextForm frm.Name, "txtFind", 3800, 900, 3600, 320, "Find"
-    ButtonForm frm.Name, "cmdSearch", "Search", "=EMSHubSearch()", 7600, 880, 1400, 360
-    ButtonForm frm.Name, "cmdNew", "New event", "=EMSNewEvent()", 9200, 880, 1600, 360
-    ButtonForm frm.Name, "cmdImport", "Import reports", "=EMSImportNew()", 11000, 880, 1800, 360
-    ButtonForm frm.Name, "cmdPayees", "Payees", "=EMSOpenPayees()", 13000, 880, 800, 360
-    Set ctl = AddControl(frm.Name, acForm, acListBox, acDetail, "lstEvents", 200, 200, 13400, 6200)
+    frm.Section(acHeader).Height = 1320
+    LabelForm frm.Name, "lblTitle", "Events", 200, 40, 4000, 320, 18, True
+    LabelForm frm.Name, "lblHint", "The list is empty until you import the two MyVenue reports or choose New event. Double-click an event to open it.", 200, 380, 13400, 220, 9, False
+    TextForm frm.Name, "txtFrom", 200, 900, 1500, 300, "From"
+    TextForm frm.Name, "txtTo", 1900, 900, 1500, 300, "To"
+    TextForm frm.Name, "txtFind", 3600, 900, 3400, 300, "Find"
+    ButtonForm frm.Name, "cmdSearch", "Search", "=EMSHubSearch()", 7200, 880, 1300, 340
+    ButtonForm frm.Name, "cmdNew", "New event", "=EMSNewEvent()", 8600, 880, 1500, 340
+    ButtonForm frm.Name, "cmdImport", "Import reports", "=EMSImportNew()", 10200, 880, 1800, 340
+    ButtonForm frm.Name, "cmdPayees", "Payees", "=EMSOpenPayees()", 12120, 880, 1400, 340
+    Set ctl = AddControl(frm.Name, acForm, acListBox, acDetail, "lstEvents", 200, 120, 13400, 6400)
     ctl.ColumnCount = 5
+    ctl.ColumnHeads = True
     ctl.ColumnWidths = "0;1600;6200;2800;1800"
     ctl.BoundColumn = 1
+    ctl.RowSource = "SELECT e.EventID, e.EventDate AS [Date], e.EventName AS [Event], e.EventType AS [Type], 0 AS [Amount due] FROM tblEvent AS e WHERE 1=0"
     ctl.OnDblClick = "=EMSOpenSelected()"
     frm.Section(acDetail).Height = 6800
     SaveObject acForm, frm.Name, "frmHub"
