@@ -624,8 +624,8 @@ Public Sub EMSRepairPayeeEmails()
     Dim child As Object
     Dim ctl As Object
     If emailsRepaired Then Exit Sub
-    EMSEnsureEmailColumns
     On Error Resume Next
+    EMSEnsureEmailColumns
     EMSEnsurePartners
     If Not CurrentProject.AllForms("frmPayee").IsLoaded Then
         emailsRepaired = True
@@ -812,10 +812,10 @@ Private Function EnsurePayee(ByVal payeeName As String, ByVal payeeType As Strin
     Dim id As Variant
     Dim noteText As String
     If abbreviation = "VOUTREACH" Then
-        id = Scalar("SELECT [PayeeID] FROM [tblPayee] WHERE [Abbreviation]='VICT'")
+        id = PayeeIdFor("VICT")
         If Not IsNull(id) Then Exec "UPDATE tblPayee SET Abbreviation='VOUTREACH' WHERE PayeeID=" & id
     End If
-    id = Scalar("SELECT [PayeeID] FROM [tblPayee] WHERE [Abbreviation]=" & SqlText(abbreviation))
+    id = PayeeIdFor(abbreviation)
     noteText = ""
     If Len(contact) > 0 Then noteText = "Primary contact: " & contact
     If abbreviation = "DNHS" Or abbreviation = "VOUTREACH" Then
@@ -828,7 +828,7 @@ Private Function EnsurePayee(ByVal payeeName As String, ByVal payeeType As Strin
         Exec "INSERT INTO tblPayee (PayeeName, PayeeType, Abbreviation, Address1, Address2, SAPID, BSSID, Phone, Notes, [Active]) VALUES (" & _
             SqlText(payeeName) & "," & SqlText(payeeType) & "," & SqlText(abbreviation) & "," & SqlText(address1) & "," & SqlText(address2) & "," & _
             SqlText(sapId) & "," & SqlText(bssId) & ",''," & SqlText(noteText) & "," & IIf(isActive, "-1", "0") & ")"
-        id = Scalar("SELECT [PayeeID] FROM [tblPayee] WHERE [Abbreviation]=" & SqlText(abbreviation))
+        id = PayeeIdFor(abbreviation)
         added = added + 1
     Else
         FillBlank "tblPayee", "Address1", address1, CLng(id)
@@ -845,12 +845,67 @@ Private Sub FillBlank(ByVal tableName As String, ByVal fieldName As String, ByVa
     Exec "UPDATE " & tableName & " SET " & fieldName & "=" & SqlText(value) & " WHERE PayeeID=" & payeeId & " AND (" & fieldName & " Is Null OR " & fieldName & "='')"
 End Sub
 
+Private Function PayeeIdFor(ByVal abbreviation As String) As Variant
+    Dim rs As Object
+    PayeeIdFor = Null
+    On Error GoTo Done
+    Set rs = CurrentDb.OpenRecordset("SELECT * FROM [tblPayee]", EMS_SNAPSHOT)
+    Do Until rs.EOF
+        If StrComp(CStr(Nz(rs!Abbreviation, "")), abbreviation, vbTextCompare) = 0 Then
+            PayeeIdFor = rs!PayeeID
+            Exit Do
+        End If
+        rs.MoveNext
+    Loop
+    rs.Close
+Done:
+End Function
+
 Private Sub EnsureEmail(ByVal payeeId As Long, ByVal address As String, ByVal label As String, ByVal isPrimary As Boolean)
-    If Len(address) = 0 Then Exit Sub
+    Dim rs As Object
+    Dim cols As String
+    Dim vals As String
+    If Len(address) = 0 Or payeeId = 0 Then Exit Sub
     EMSEnsureEmailColumns
-    If CLng(Nz(Scalar("SELECT Count(*) FROM [tblPayeeEmail] WHERE [PayeeID]=" & payeeId & " AND [EmailAddress]=" & SqlText(address)), 0)) > 0 Then Exit Sub
-    Exec "INSERT INTO [tblPayeeEmail] ([PayeeID], [EmailAddress], [Label], [IsPrimary]) VALUES (" & payeeId & "," & SqlText(address) & "," & SqlText(label) & "," & IIf(isPrimary, "-1", "0") & ")"
+    On Error GoTo Done
+    Set rs = CurrentDb.OpenRecordset("SELECT * FROM [tblPayeeEmail]", EMS_SNAPSHOT)
+    If Not RecordHas(rs, "PayeeID") Or Not RecordHas(rs, "EmailAddress") Then
+        rs.Close
+        Exit Sub
+    End If
+    Do Until rs.EOF
+        If CLng(Nz(rs!PayeeID, 0)) = payeeId Then
+            If StrComp(CStr(Nz(rs!EmailAddress, "")), address, vbTextCompare) = 0 Then
+                rs.Close
+                Exit Sub
+            End If
+        End If
+        rs.MoveNext
+    Loop
+    rs.Close
+    cols = "[PayeeID], [EmailAddress]"
+    vals = payeeId & "," & SqlText(address)
+    If ColumnExists("tblPayeeEmail", "Label") Then
+        cols = cols & ", [Label]"
+        vals = vals & "," & SqlText(label)
+    End If
+    If ColumnExists("tblPayeeEmail", "IsPrimary") Then
+        cols = cols & ", [IsPrimary]"
+        vals = vals & "," & IIf(isPrimary, "-1", "0")
+    End If
+    Exec "INSERT INTO [tblPayeeEmail] (" & cols & ") VALUES (" & vals & ")"
+Done:
 End Sub
+
+Private Function RecordHas(ByVal rs As Object, ByVal fieldName As String) As Boolean
+    Dim fld As Object
+    For Each fld In rs.Fields
+        If StrComp(CStr(fld.Name), fieldName, vbTextCompare) = 0 Then
+            RecordHas = True
+            Exit Function
+        End If
+    Next fld
+End Function
 
 Private Sub EnsureNpoRates(ByVal payeeId As Long)
     EnsureRate payeeId, "DONATION_FOOD", 0.1, #1/1/2026#, Null
@@ -870,11 +925,11 @@ End Sub
 Private Sub RepairLagunaRates(ByVal payeeId As Long)
     Dim foodId As Variant
     Dim tipId As Variant
-    foodId = Scalar("SELECT RateID FROM tblPayeeRate WHERE PayeeID=" & payeeId & " AND RateCode='FOOD' AND Abs(RateAmount-0.7)<0.000001 AND EndDate Is Null AND EffectiveDate=#01/01/2026#")
+    foodId = RateIdFor(payeeId, "FOOD", #1/1/2026#, 0.7)
     If Not IsNull(foodId) Then
         Exec "UPDATE tblPayeeRate SET RateAmount=0.8, EndDate=#10/17/2026# WHERE RateID=" & foodId
     End If
-    tipId = Scalar("SELECT RateID FROM tblPayeeRate WHERE PayeeID=" & payeeId & " AND RateCode='TIP_WITHHOLD' AND Abs(RateAmount-0.1)<0.000001 AND EndDate Is Null AND EffectiveDate=#01/01/2026#")
+    tipId = RateIdFor(payeeId, "TIP_WITHHOLD", #1/1/2026#, 0.1)
     If Not IsNull(tipId) Then
         Exec "UPDATE tblPayeeRate SET RateAmount=0, EndDate=#10/17/2026# WHERE RateID=" & tipId
     End If
@@ -890,11 +945,62 @@ End Sub
 
 Private Sub EnsureRate(ByVal payeeId As Long, ByVal code As String, ByVal amount As Double, ByVal startOn As Date, ByVal endOn As Variant)
     Dim endSql As String
-    If Not IsNull(Scalar("SELECT RateID FROM tblPayeeRate WHERE PayeeID=" & payeeId & " AND RateCode=" & SqlText(code) & " AND EffectiveDate=" & SqlHash(startOn))) Then Exit Sub
+    If RateExists(payeeId, code, startOn) Then Exit Sub
     If IsNull(endOn) Then endSql = "Null" Else endSql = SqlHash(CDate(endOn))
     Exec "INSERT INTO tblPayeeRate (PayeeID, RateCode, RateAmount, EffectiveDate, EndDate, Notes) VALUES (" & _
         payeeId & "," & SqlText(code) & "," & SqlRate(amount) & "," & SqlHash(startOn) & "," & endSql & ",'')"
 End Sub
+
+Private Function RateExists(ByVal payeeId As Long, ByVal code As String, ByVal startOn As Date) As Boolean
+    Dim rs As Object
+    On Error GoTo Done
+    Set rs = CurrentDb.OpenRecordset("SELECT * FROM [tblPayeeRate]", EMS_SNAPSHOT)
+    Do Until rs.EOF
+        If CLng(Nz(rs!PayeeID, 0)) = payeeId Then
+            If StrComp(CStr(Nz(rs!RateCode, "")), code, vbTextCompare) = 0 Then
+                If IsDate(rs!EffectiveDate) Then
+                    If CDate(rs!EffectiveDate) = startOn Then
+                        RateExists = True
+                        Exit Do
+                    End If
+                End If
+            End If
+        End If
+        rs.MoveNext
+    Loop
+    rs.Close
+Done:
+End Function
+
+Private Function RateIdFor(ByVal payeeId As Long, ByVal code As String, ByVal startOn As Date, ByVal amountMatch As Double) As Variant
+    Dim rs As Object
+    RateIdFor = Null
+    On Error GoTo Done
+    Set rs = CurrentDb.OpenRecordset("SELECT * FROM [tblPayeeRate]", EMS_SNAPSHOT)
+    If Not RecordHas(rs, "RateID") Then
+        rs.Close
+        Exit Function
+    End If
+    Do Until rs.EOF
+        If CLng(Nz(rs!PayeeID, 0)) = payeeId Then
+            If StrComp(CStr(Nz(rs!RateCode, "")), code, vbTextCompare) = 0 Then
+                If IsDate(rs!EffectiveDate) Then
+                    If CDate(rs!EffectiveDate) = startOn Then
+                        If Abs(CDbl(Nz(rs!RateAmount, 0)) - amountMatch) < 0.000001 Then
+                            If IsNull(rs!EndDate) Then
+                                RateIdFor = rs!RateID
+                                Exit Do
+                            End If
+                        End If
+                    End If
+                End If
+            End If
+        End If
+        rs.MoveNext
+    Loop
+    rs.Close
+Done:
+End Function
 
 Private Function SqlHash(ByVal day As Date) As String
     SqlHash = "#" & Format$(day, "mm/dd/yyyy") & "#"
