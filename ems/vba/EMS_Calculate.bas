@@ -530,14 +530,16 @@ End Function
 
 ' Adds any payee columns this screen expects. A missing name is what made Access ask for SAPID.
 Public Sub EMSEnsurePayeeColumns()
-    EnsureColumn "tblPayee", "SAPID", "TEXT(255)"
-    EnsureColumn "tblPayee", "BSSID", "TEXT(255)"
-    EnsureColumn "tblPayee", "Address1", "TEXT(255)"
-    EnsureColumn "tblPayee", "Address2", "TEXT(255)"
-    EnsureColumn "tblPayee", "Phone", "TEXT(255)"
-    EnsureColumn "tblPayee", "Notes", "MEMO"
-    EnsureColumn "tblPayee", "Abbreviation", "TEXT(255)"
-    EnsureColumn "tblPayee", "PayeeType", "TEXT(255)"
+    EnsureColumn "tblPayee", "SAPID", "TEXT(255)", False
+    EnsureColumn "tblPayee", "BSSID", "TEXT(255)", False
+    EnsureColumn "tblPayee", "Address1", "TEXT(255)", False
+    EnsureColumn "tblPayee", "Address2", "TEXT(255)", False
+    EnsureColumn "tblPayee", "Phone", "TEXT(255)", False
+    EnsureColumn "tblPayee", "Notes", "MEMO", False
+    EnsureColumn "tblPayee", "Abbreviation", "TEXT(255)", False
+    EnsureColumn "tblPayee", "PayeeType", "TEXT(255)", False
+    ' The open file has no Active column. That is the "unknown field" and the list error.
+    EnsureColumn "tblPayee", "Active", "YESNO", True
 End Sub
 
 Public Sub EMSDropPayeeQuery()
@@ -547,16 +549,25 @@ Public Sub EMSDropPayeeQuery()
     On Error GoTo 0
 End Sub
 
-Private Sub EnsureColumn(ByVal tableName As String, ByVal fieldName As String, ByVal fieldType As String)
+Private Sub EnsureColumn(ByVal tableName As String, ByVal fieldName As String, ByVal fieldType As String, ByVal fillYes As Boolean)
+    Dim db As Object
     Dim rs As Object
+    Set db = CurrentDb
     On Error Resume Next
-    Set rs = CurrentDb.OpenRecordset("SELECT [" & fieldName & "] FROM [" & tableName & "] WHERE 1=0", EMS_SNAPSHOT)
-    If Err.Number <> 0 Then
-        Err.Clear
-        CurrentDb.Execute "ALTER TABLE [" & tableName & "] ADD COLUMN [" & fieldName & "] " & fieldType
-    Else
+    Set rs = db.OpenRecordset("SELECT [" & fieldName & "] FROM [" & tableName & "] WHERE 1=0", EMS_SNAPSHOT)
+    If Err.Number = 0 Then
         rs.Close
+        On Error GoTo 0
+        Exit Sub
     End If
+    Err.Clear
+    db.Execute "ALTER TABLE [" & tableName & "] ADD COLUMN [" & fieldName & "] " & fieldType
+    If Err.Number <> 0 Then
+        On Error GoTo 0
+        Exit Sub
+    End If
+    db.TableDefs.Refresh
+    If fillYes Then db.Execute "UPDATE [" & tableName & "] SET [" & fieldName & "]=-1"
     On Error GoTo 0
 End Sub
 
@@ -587,8 +598,8 @@ Private Sub LoadPayeeRows()
     EMSEnsurePayeeColumns
     showAll = False
     If CurrentProject.AllForms("frmPayee").IsLoaded Then showAll = CBool(Nz(Forms!frmPayee!chkShowInactive, False))
-    sql = "SELECT PayeeID, PayeeName, PayeeType, Abbreviation, SAPID, BSSID, Active FROM tblPayee"
-    If Not showAll Then sql = sql & " WHERE Active<>0"
+    sql = "SELECT PayeeID, PayeeName, PayeeType, Abbreviation, SAPID, BSSID, [Active] FROM tblPayee"
+    If Not showAll Then sql = sql & " WHERE [Active]<>0"
     sql = sql & " ORDER BY PayeeName"
     Set rs = CurrentDb.OpenRecordset(sql, EMS_SNAPSHOT)
     payeeCount = 0
@@ -647,6 +658,7 @@ End Function
 Public Function EMSEnsurePartners() As Long
     Dim added As Long
     Dim payeeId As Long
+    EMSEnsurePayeeColumns
     payeeId = EnsurePayee("Albuquerque Rebels Volleyball Club", "NPO", "ARVC", "7800 LAS LOMITAS AVENUE NE", "Albuquerque, NM 87113-2645", "1013051", "5487", "Senobia Szuch", True, added)
     EnsureEmail payeeId, "gabe.padilla07@yahoo.com", "Primary", True
     EnsureEmail payeeId, "jillianshane@sbcglobal.net", "Additional", False
@@ -702,7 +714,7 @@ Private Function EnsurePayee(ByVal payeeName As String, ByVal payeeType As Strin
     If abbreviation = "SUG" Then noteText = "Earlier Sugar Shivers contract. Current payee abbreviation is SUGAR."
     If abbreviation = "OHANA" Then noteText = "Primary contact: Mike Walker. Prior database also used abbreviation NOOD."
     If IsNull(id) Then
-        Exec "INSERT INTO tblPayee (PayeeName, PayeeType, Abbreviation, Address1, Address2, SAPID, BSSID, Phone, Notes, Active) VALUES (" & _
+        Exec "INSERT INTO tblPayee (PayeeName, PayeeType, Abbreviation, Address1, Address2, SAPID, BSSID, Phone, Notes, [Active]) VALUES (" & _
             SqlText(payeeName) & "," & SqlText(payeeType) & "," & SqlText(abbreviation) & "," & SqlText(address1) & "," & SqlText(address2) & "," & _
             SqlText(sapId) & "," & SqlText(bssId) & ",''," & SqlText(noteText) & "," & IIf(isActive, "-1", "0") & ")"
         id = Scalar("SELECT PayeeID FROM tblPayee WHERE Abbreviation=" & SqlText(abbreviation))

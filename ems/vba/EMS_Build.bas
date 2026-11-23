@@ -248,7 +248,7 @@ Private Sub BuildAssign()
     DatasheetBox frm.Name, "AlcoholNet", "Alcohol net", 1200
     DatasheetBox frm.Name, "PosTips", "Tips", 1100
     DatasheetCombo frm.Name, "Role", "Value List", "NPO;SUB;STAFF;OPEN", 1, "1400", "Role", 1100
-    DatasheetCombo frm.Name, "PayeeID", "Table/Query", "SELECT PayeeID, PayeeName FROM tblPayee WHERE Active<>0 ORDER BY PayeeName", 2, "0;3600", "Payee", 2800
+    DatasheetCombo frm.Name, "PayeeID", "Table/Query", "SELECT PayeeID, PayeeName FROM tblPayee WHERE [Active]<>0 ORDER BY PayeeName", 2, "0;3600", "Payee", 2800
     DatasheetBox frm.Name, "Headcount", "People", 900
     DatasheetBox frm.Name, "StaffNames", "Staff names", 2400
     DatasheetBox frm.Name, "CookFee", "Cook fee", 1000
@@ -264,7 +264,7 @@ Private Sub BuildVendor()
     frm.Caption = "Vendor tenders and ice"
     frm.RecordSource = "tblVendorInput"
     UseDatasheet frm
-    DatasheetCombo frm.Name, "PayeeID", "Table/Query", "SELECT PayeeID, PayeeName FROM tblPayee WHERE PayeeType='SUB' AND Active<>0 ORDER BY PayeeName", 2, "0;3600", "Vendor", 2800
+    DatasheetCombo frm.Name, "PayeeID", "Table/Query", "SELECT PayeeID, PayeeName FROM tblPayee WHERE PayeeType='SUB' AND [Active]<>0 ORDER BY PayeeName", 2, "0;3600", "Vendor", 2800
     DatasheetBox frm.Name, "CashTender", "Cash", 1200
     DatasheetBox frm.Name, "CardTender", "Cards", 1200
     DatasheetBox frm.Name, "CorporateVoucher", "Corporate voucher", 1800
@@ -281,7 +281,7 @@ Private Sub BuildSupplement()
     frm.Caption = "Supplements"
     frm.RecordSource = "tblSupplement"
     UseDatasheet frm
-    DatasheetCombo frm.Name, "PayeeID", "Table/Query", "SELECT PayeeID, Abbreviation FROM tblPayee WHERE Active<>0 ORDER BY Abbreviation", 2, "0;1400", "Payee", 1400
+    DatasheetCombo frm.Name, "PayeeID", "Table/Query", "SELECT PayeeID, Abbreviation FROM tblPayee WHERE [Active]<>0 ORDER BY Abbreviation", 2, "0;1400", "Payee", 1400
     DatasheetBox frm.Name, "Label", "Label", 2400
     DatasheetBox frm.Name, "Amount", "Amount", 1200
     DatasheetBox frm.Name, "GLCode", "GL", 1200
