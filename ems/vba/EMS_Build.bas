@@ -85,48 +85,108 @@ Private Sub BuildEvent()
     Dim frm As Form
     Dim ctl As Control
     Set frm = CreateForm()
-    frm.Caption = "Event"
+    frm.Caption = "Event assignments"
     frm.RecordSource = "tblEvent"
-    frm.Width = 16200
+    frm.DefaultView = 0
+    frm.Width = 16000
+    frm.RecordSelectors = False
+    frm.NavigationButtons = False
+    frm.ScrollBars = 2
     frm.OnCurrent = "=EMSEventOpen()"
     EnsureFormHeader frm.Name
-    frm.Section(acHeader).Height = 780
-    ButtonForm frm.Name, "cmdBack", "Events", "=EMSBackToEvents()", 80, 160, 1200, 400
-    ButtonForm frm.Name, "cmdImport", "Import onto this event", "=EMSImportCurrent()", 1400, 160, 2600, 400
-    ButtonForm frm.Name, "cmdCalc", "Calculate", "=EMSCalculateCurrent()", 4120, 160, 1500, 400
-    ButtonForm frm.Name, "cmdPreview", "Preview", "=EMSPreviewCurrent()", 5740, 160, 1400, 400
-    ButtonForm frm.Name, "cmdPdf", "PDF", "=EMSExportCurrent()", 7260, 160, 1200, 400
-    ButtonForm frm.Name, "cmdMail", "Email", "=EMSEmailCurrent()", 8580, 160, 1400, 400
-    ButtonForm frm.Name, "cmdDelete", "Delete event", "=EMSDeleteEvent()", 12800, 160, 1800, 400
+    frm.Section(acHeader).Height = 640
+    frm.Section(acHeader).BackColor = RGB(232, 236, 240)
+    frm.Section(acDetail).BackColor = vbWhite
+    LabelForm frm.Name, "lblTitle", "Event assignments", 160, 120, 2800, 400, 18, True
+    ButtonForm frm.Name, "cmdBack", "Events", "=EMSBackToEvents()", 3100, 120, 1100, 400
+    ButtonForm frm.Name, "cmdImport", "Import", "=EMSImportCurrent()", 4320, 120, 1400, 400
+    ButtonForm frm.Name, "cmdCalc", "Calculate", "=EMSCalculateCurrent()", 5840, 120, 1500, 400
+    ButtonForm frm.Name, "cmdPreview", "Preview", "=EMSPreviewCurrent()", 7460, 120, 1300, 400
+    ButtonForm frm.Name, "cmdPdf", "PDF", "=EMSExportCurrent()", 8880, 120, 1000, 400
+    ButtonForm frm.Name, "cmdMail", "Email", "=EMSEmailCurrent()", 10000, 120, 1200, 400
+    ButtonForm frm.Name, "cmdDelete", "Delete event", "=EMSDeleteEvent()", 13600, 120, 2000, 400
     BoundBox frm.Name, "EventID", "", 0, 0, 10, 10, False
-    BoundBox frm.Name, "EventDate", "Event date", 200, 40, 1600, 280, True
-    BoundBox frm.Name, "EventName", "Event", 2000, 40, 5200, 280, True
-    BoundBox frm.Name, "EventType", "Type", 7400, 40, 2400, 280, True
-    BoundBox frm.Name, "Venue", "Venue", 200, 420, 4000, 280, True
-    BoundBox frm.Name, "MinimumCommission", "Minimum commission", 4400, 420, 1800, 280, True
-    BoundBox frm.Name, "Notes", "Notes", 200, 800, 9000, 460, True
-    Set ctl = AddControl(frm.Name, acForm, acTextBox, acDetail, "txtDue", 9400, 980, 2800, 320)
+    EventLine frm.Name, "EventDate", "Event date", 160, 80, 1800, False
+    EventLine frm.Name, "EventName", "Event", 2120, 80, 6400, False
+    EventLine frm.Name, "EventType", "Type", 8680, 80, 2800, False
+    Set ctl = AddControl(frm.Name, acForm, acTextBox, acDetail, "txtDue", 11680, 300, 2400, 320)
     ctl.ControlSource = "=Nz(DSum('AmountDue','tblInvoice','EventID=' & Nz([EventID],0)),0)"
     ctl.Format = "Currency"
+    ctl.BorderStyle = 1
+    ctl.BorderColor = RGB(196, 202, 210)
+    ctl.BackColor = vbWhite
+    ctl.TextAlign = 3
     ctl.FontBold = True
-    LabelDetail frm.Name, "lblDue", "Amount due", 9400, 800, 2000, 180, 8, True
-    LabelDetail frm.Name, "lblHow", "Add a stand in the grid when there is no file, and type its nets. Import fills those nets from the price report. A blank people count holds only that stand's tips.", 200, 1400, 15000, 240, 9, False
-    LinkSubform frm.Name, "fsubAssign", "fsubAssign", 120, 1700, 15800, 2500
-    LinkSubform frm.Name, "fsubVendor", "fsubVendor", 120, 4300, 15800, 1200
-    LinkSubform frm.Name, "fsubSupplement", "fsubSupplement", 120, 5600, 7800, 1100
-    LinkSubform frm.Name, "fsubStaff", "fsubStaff", 8100, 5600, 7800, 1100
-    Set ctl = AddControl(frm.Name, acForm, acListBox, acDetail, "lstInvoices", 120, 6820, 7800, 1300)
+    Paint ctl, 12, True
+    LabelDetail frm.Name, "lblDue", "Amount due", 11680, 80, 2400, 200, 9, False
+    EventLine frm.Name, "Venue", "Venue", 160, 720, 4200, False
+    EventLine frm.Name, "MinimumCommission", "Minimum commission", 4520, 720, 2400, True
+    EventLine frm.Name, "Notes", "Notes", 7080, 720, 7000, False
+    LabelDetail frm.Name, "lblHow", "Import fills the stand nets. Choose a role and payee for each stand. A blank people count holds only that stand's tips.", 160, 1360, 15000, 240, 9, False
+    LabelDetail frm.Name, "lblStands", "Stands", 160, 1660, 4000, 320, 16, True
+    Set ctl = LinkSubform(frm.Name, "fsubAssign", "fsubAssign", 160, 2040, 15680, 4200)
+    ctl.BorderStyle = 1
+    LabelDetail frm.Name, "lblPick", "Selected stand", 160, 6340, 4000, 280, 14, True
+    StandMoney frm.Name, "CookFee", "Cook fee", 160, 6680
+    StandMoney frm.Name, "Bonus", "Bonus", 2100, 6680
+    StandMoney frm.Name, "Shortage", "Shortage", 4040, 6680
+    StandMoney frm.Name, "Cleaning", "Cleaning", 5980, 6680
+    StandText frm.Name, "DepartmentName", "Department", 7920, 6680, 4200
+    LabelDetail frm.Name, "lblVendor", "Vendor costs", 160, 7360, 4000, 280, 14, True
+    Set ctl = LinkSubform(frm.Name, "fsubVendor", "fsubVendor", 160, 7700, 15680, 1100)
+    ctl.BorderStyle = 1
+    LabelDetail frm.Name, "lblSupp", "Adjustments", 160, 8920, 4000, 280, 14, True
+    LabelDetail frm.Name, "lblStaff", "Staff tips", 8200, 8920, 4000, 280, 14, True
+    Set ctl = LinkSubform(frm.Name, "fsubSupplement", "fsubSupplement", 160, 9260, 7800, 1100)
+    ctl.BorderStyle = 1
+    Set ctl = LinkSubform(frm.Name, "fsubStaff", "fsubStaff", 8200, 9260, 7640, 1100)
+    ctl.BorderStyle = 1
+    LabelDetail frm.Name, "lblInv", "Invoices", 160, 10480, 4000, 280, 14, True
+    LabelDetail frm.Name, "lblExc", "Exceptions", 8200, 10480, 4000, 280, 14, True
+    Set ctl = AddControl(frm.Name, acForm, acListBox, acDetail, "lstInvoices", 160, 10820, 7800, 1100)
     ctl.RowSource = "SELECT i.InvoiceID, p.Abbreviation, i.InvoiceNumber, i.AmountDue FROM tblInvoice AS i INNER JOIN tblPayee AS p ON i.PayeeID=p.PayeeID WHERE i.EventID=[Forms]![frmEvent]![EventID] ORDER BY p.Abbreviation"
     ctl.ColumnCount = 4
     ctl.ColumnWidths = "0;1200;3200;1600"
     ctl.BoundColumn = 1
+    ctl.BorderStyle = 1
     ctl.OnDblClick = "=EMSPreviewCurrent()"
-    Set ctl = AddControl(frm.Name, acForm, acListBox, acDetail, "lstExceptions", 8100, 6820, 7800, 1300)
+    Set ctl = AddControl(frm.Name, acForm, acListBox, acDetail, "lstExceptions", 8200, 10820, 7640, 1100)
     ctl.RowSource = "SELECT Kind, Detail FROM tblException WHERE EventID=[Forms]![frmEvent]![EventID] ORDER BY ExceptionID"
     ctl.ColumnCount = 2
-    ctl.ColumnWidths = "1600;6000"
-    frm.Section(acDetail).Height = 8240
+    ctl.ColumnWidths = "1800;5600"
+    ctl.BorderStyle = 1
+    frm.Section(acDetail).Height = 12100
     SaveObject acForm, frm.Name, "frmEvent"
+End Sub
+
+Public Sub BuildEventScreen()
+    On Error GoTo Failed
+    Dim id As Variant
+    DoCmd.Hourglass True
+    EMSEnsurePayeeColumns
+    CloseOpenDesign
+    DropObject acForm, "frmEvent"
+    DropObject acForm, "fsubAssign"
+    DropObject acForm, "fsubVendor"
+    DropObject acForm, "fsubSupplement"
+    DropObject acForm, "fsubStaff"
+    BuildAssign
+    BuildVendor
+    BuildSupplement
+    BuildStaff
+    BuildEvent
+    DoCmd.Hourglass False
+    id = Scalar("SELECT Max(EventID) FROM tblEvent")
+    If IsNull(id) Then
+        DoCmd.OpenForm "frmEvent"
+    Else
+        DoCmd.OpenForm "frmEvent", , , "EventID=" & id
+    End If
+    Exit Sub
+Failed:
+    DoCmd.Hourglass False
+    CloseOpenDesign
+    MsgBox "Build stopped." & vbCrLf & Err.Description, vbCritical
 End Sub
 
 ' Removes the status and signature columns from the event table. The statement still prints the office names, dated with the event.
@@ -264,75 +324,215 @@ Public Function GoToNewPayee()
     Forms!frmPayee!txtPayeeName.SetFocus
 End Function
 
+Private Sub StandMoney(ByVal formName As String, ByVal fieldName As String, ByVal caption As String, ByVal x As Long, ByVal rowTop As Long)
+    StandBind formName, fieldName, caption, x, rowTop, 1800, True
+End Sub
+
+Private Sub StandText(ByVal formName As String, ByVal fieldName As String, ByVal caption As String, ByVal x As Long, ByVal rowTop As Long, ByVal width As Long)
+    StandBind formName, fieldName, caption, x, rowTop, width, False
+End Sub
+
+Private Sub StandBind(ByVal formName As String, ByVal fieldName As String, ByVal caption As String, ByVal x As Long, ByVal rowTop As Long, ByVal width As Long, ByVal money As Boolean)
+    Dim ctl As Control
+    LabelDetail formName, "lbl" & fieldName, caption, x, rowTop, width, 200, 9, False
+    Set ctl = AddControl(formName, acForm, acTextBox, acDetail, "txt" & fieldName, x, rowTop + 220, width, 320)
+    ctl.ControlSource = "=[fsubAssign].[Form]![col" & fieldName & "]"
+    ctl.BorderStyle = 1
+    ctl.BorderColor = RGB(196, 202, 210)
+    ctl.BackColor = vbWhite
+    If money Then ctl.Format = "Currency"
+    Paint ctl, 11, False
+End Sub
+
+Private Sub EventLine(ByVal formName As String, ByVal fieldName As String, ByVal caption As String, ByVal x As Long, ByVal rowTop As Long, ByVal width As Long, ByVal money As Boolean)
+    Dim ctl As Control
+    LabelDetail formName, "lbl" & fieldName, caption, x, rowTop, width, 200, 9, False
+    Set ctl = AddControl(formName, acForm, acTextBox, acDetail, "txt" & fieldName, x, rowTop + 220, width, 320)
+    ctl.ControlSource = fieldName
+    ctl.BorderStyle = 1
+    ctl.BorderColor = RGB(196, 202, 210)
+    ctl.BackColor = vbWhite
+    If fieldName = "EventDate" Then ctl.Format = "mm/dd/yyyy"
+    If money Then ctl.Format = "Currency"
+    Paint ctl, 11, False
+End Sub
+
+Private Sub GridHead(ByVal formName As String, ByVal controlName As String, ByVal caption As String, ByVal x As Long, ByVal width As Long)
+    Dim ctl As Control
+    Set ctl = AddControl(formName, acForm, acLabel, acHeader, controlName, x, 40, width, 280)
+    ctl.Caption = caption
+    Paint ctl, 9, True
+End Sub
+
+Private Sub GridCell(ByVal formName As String, ByVal fieldName As String, ByVal x As Long, ByVal width As Long, ByVal money As Boolean)
+    Dim ctl As Control
+    Set ctl = AddControl(formName, acForm, acTextBox, acDetail, "col" & fieldName, x, 40, width, 320)
+    ctl.ControlSource = fieldName
+    ctl.BorderStyle = 1
+    ctl.BorderColor = RGB(196, 202, 210)
+    ctl.BackColor = vbWhite
+    If money Then
+        ctl.Format = "Currency"
+        ctl.TextAlign = 3
+    End If
+    Paint ctl, 10, False
+End Sub
+
+Private Sub GridCombo(ByVal formName As String, ByVal fieldName As String, ByVal x As Long, ByVal width As Long, ByVal sourceType As String, ByVal source As String, ByVal columns As Long, ByVal widths As String)
+    Dim ctl As Control
+    Set ctl = AddControl(formName, acForm, acComboBox, acDetail, "col" & fieldName, x, 40, width, 320)
+    ctl.ControlSource = fieldName
+    ctl.RowSourceType = sourceType
+    ctl.RowSource = source
+    ctl.ColumnCount = columns
+    ctl.ColumnWidths = widths
+    ctl.BoundColumn = 1
+    ctl.LimitToList = True
+    ctl.BorderStyle = 1
+    ctl.BorderColor = RGB(196, 202, 210)
+    ctl.BackColor = vbWhite
+    Paint ctl, 10, False
+    ctl.ListRows = 16
+End Sub
+
+Private Function OpenGrid(ByVal caption As String, ByVal source As String, ByVal width As Long) As Form
+    Dim frm As Form
+    Set frm = CreateForm()
+    frm.Caption = caption
+    frm.RecordSource = source
+    frm.DefaultView = 1
+    frm.RecordSelectors = True
+    frm.NavigationButtons = True
+    frm.ScrollBars = 2
+    frm.DividingLines = True
+    frm.Width = width
+    EnsureFormHeader frm.Name
+    frm.Section(acHeader).Height = 360
+    frm.Section(acHeader).BackColor = RGB(232, 236, 240)
+    frm.Section(acDetail).Height = 400
+    frm.Section(acDetail).BackColor = vbWhite
+    On Error Resume Next
+    frm.Section(acDetail).AlternateBackColor = RGB(245, 247, 250)
+    On Error GoTo 0
+    Set OpenGrid = frm
+End Function
+
+Private Sub HideKey(ByVal formName As String, ByVal fieldName As String)
+    GridCell formName, fieldName, 0, 10, False
+    Forms(formName).Controls("col" & fieldName).Visible = False
+    Forms(formName).Controls("col" & fieldName).TabStop = False
+End Sub
+
 Private Sub BuildAssign()
     Dim frm As Form
     Set frm = CreateForm()
     frm.Caption = "Stands"
     frm.RecordSource = "tblAssign"
-    UseDatasheet frm
-    DatasheetBox frm.Name, "LocationName", "Stand", 2400
-    DatasheetBox frm.Name, "DepartmentName", "Department", 1800
-    DatasheetBox frm.Name, "PosSales", "POS sales", 1200
-    DatasheetBox frm.Name, "FoodNet", "Food net", 1200
-    DatasheetBox frm.Name, "NaNet", "NA net", 1100
-    DatasheetBox frm.Name, "AlcoholNet", "Alcohol net", 1200
-    DatasheetBox frm.Name, "PosTips", "Tips", 1100
-    DatasheetCombo frm.Name, "Role", "Value List", "NPO;SUB;STAFF;OPEN", 1, "1400", "Role", 1100
-    DatasheetCombo frm.Name, "PayeeID", "Table/Query", "SELECT PayeeID, PayeeName FROM tblPayee WHERE [Active]<>0 ORDER BY PayeeName", 2, "0;3600", "Payee", 2800
-    DatasheetBox frm.Name, "Headcount", "People", 900
-    DatasheetBox frm.Name, "StaffNames", "Staff names", 2400
-    DatasheetBox frm.Name, "CookFee", "Cook fee", 1000
-    DatasheetBox frm.Name, "Bonus", "Bonus", 1000
-    DatasheetBox frm.Name, "Shortage", "Shortage", 1000
-    DatasheetBox frm.Name, "Cleaning", "Cleaning", 1100
+    frm.DefaultView = 1
+    frm.RecordSelectors = True
+    frm.NavigationButtons = True
+    frm.ScrollBars = 2
+    frm.DividingLines = True
+    frm.Width = 15680
+    EnsureFormHeader frm.Name
+    frm.Section(acHeader).Height = 360
+    frm.Section(acHeader).BackColor = RGB(232, 236, 240)
+    frm.Section(acDetail).Height = 400
+    frm.Section(acDetail).BackColor = vbWhite
+    On Error Resume Next
+    frm.Section(acDetail).AlternateBackColor = RGB(245, 247, 250)
+    On Error GoTo 0
+    frm.Width = 15000
+    GridHead frm.Name, "lblLocation", "Location", 40, 2600
+    GridHead frm.Name, "lblRole", "Role", 2680, 1200
+    GridHead frm.Name, "lblPayee", "Payee", 3920, 1600
+    GridHead frm.Name, "lblFood", "Food net", 5560, 1200
+    GridHead frm.Name, "lblNA", "NA net", 6800, 1100
+    GridHead frm.Name, "lblAlcohol", "Alcohol net", 7940, 1300
+    GridHead frm.Name, "lblTips", "Tips", 9280, 1100
+    GridHead frm.Name, "lblPeople", "People", 10420, 800
+    GridHead frm.Name, "lblNames", "Staff names", 11260, 2200
+    GridCell frm.Name, "AssignID", 0, 10, False
+    GridCell frm.Name, "EventID", 0, 10, False
+    Forms(frm.Name).Controls("colAssignID").Visible = False
+    Forms(frm.Name).Controls("colEventID").Visible = False
+    Forms(frm.Name).Controls("colAssignID").TabStop = False
+    Forms(frm.Name).Controls("colEventID").TabStop = False
+    GridCell frm.Name, "LocationName", 40, 2600, False
+    GridCombo frm.Name, "Role", 2680, 1200, "Value List", "NPO;SUB;STAFF;OPEN", 1, "1200"
+    GridCombo frm.Name, "PayeeID", 3920, 1600, "Table/Query", "SELECT PayeeID, Abbreviation FROM tblPayee WHERE [Active]<>0 ORDER BY Abbreviation", 2, "0;1400"
+    GridCell frm.Name, "FoodNet", 5560, 1200, True
+    GridCell frm.Name, "NaNet", 6800, 1100, True
+    GridCell frm.Name, "AlcoholNet", 7940, 1300, True
+    GridCell frm.Name, "PosTips", 9280, 1100, True
+    GridCell frm.Name, "Headcount", 10420, 800, False
+    GridCell frm.Name, "StaffNames", 11260, 2200, False
+    HideKey frm.Name, "CookFee"
+    HideKey frm.Name, "Bonus"
+    HideKey frm.Name, "Shortage"
+    HideKey frm.Name, "Cleaning"
+    HideKey frm.Name, "DepartmentName"
+    ButtonFormDetail frm.Name, "cmdRemove", "Remove", "=EMSRemoveStand()", 13520, 40, 1300, 300
     SaveObject acForm, frm.Name, "fsubAssign"
 End Sub
 
 Private Sub BuildVendor()
     Dim frm As Form
-    Set frm = CreateForm()
-    frm.Caption = "Vendor tenders and ice"
-    frm.RecordSource = "tblVendorInput"
-    UseDatasheet frm
-    DatasheetCombo frm.Name, "PayeeID", "Table/Query", "SELECT PayeeID, PayeeName FROM tblPayee WHERE PayeeType='SUB' AND [Active]<>0 ORDER BY PayeeName", 2, "0;3600", "Vendor", 2800
-    DatasheetBox frm.Name, "CashTender", "Cash", 1200
-    DatasheetBox frm.Name, "CardTender", "Cards", 1200
-    DatasheetBox frm.Name, "CorporateVoucher", "Corporate voucher", 1800
-    DatasheetBox frm.Name, "LevyNfpVoucher", "Levy voucher", 1600
-    DatasheetBox frm.Name, "UnmGuestVoucher", "UNM voucher", 1600
-    DatasheetBox frm.Name, "IceAmount", "Ice", 1200
-    DatasheetBox frm.Name, "OtherExpense", "Other", 1200
+    Set frm = OpenGrid("Vendor costs", "tblVendorInput", 13800)
+    HideKey frm.Name, "EventID"
+    GridHead frm.Name, "lblVendor", "Vendor", 40, 2200
+    GridHead frm.Name, "lblCash", "Cash", 2280, 1400
+    GridHead frm.Name, "lblCards", "Cards", 3720, 1400
+    GridHead frm.Name, "lblCorp", "Corporate voucher", 5160, 1900
+    GridHead frm.Name, "lblLevy", "Levy voucher", 7100, 1700
+    GridHead frm.Name, "lblUnm", "UNM voucher", 8840, 1700
+    GridHead frm.Name, "lblIce", "Ice", 10580, 1400
+    GridHead frm.Name, "lblOther", "Other", 12020, 1400
+    GridCombo frm.Name, "PayeeID", 40, 2200, "Table/Query", "SELECT PayeeID, Abbreviation FROM tblPayee WHERE PayeeType='SUB' AND [Active]<>0 ORDER BY Abbreviation", 2, "0;2000"
+    GridCell frm.Name, "CashTender", 2280, 1400, True
+    GridCell frm.Name, "CardTender", 3720, 1400, True
+    GridCell frm.Name, "CorporateVoucher", 5160, 1900, True
+    GridCell frm.Name, "LevyNfpVoucher", 7100, 1700, True
+    GridCell frm.Name, "UnmGuestVoucher", 8840, 1700, True
+    GridCell frm.Name, "IceAmount", 10580, 1400, True
+    GridCell frm.Name, "OtherExpense", 12020, 1400, True
     SaveObject acForm, frm.Name, "fsubVendor"
 End Sub
 
 Private Sub BuildSupplement()
     Dim frm As Form
-    Set frm = CreateForm()
-    frm.Caption = "Supplements"
-    frm.RecordSource = "tblSupplement"
-    UseDatasheet frm
-    DatasheetCombo frm.Name, "PayeeID", "Table/Query", "SELECT PayeeID, Abbreviation FROM tblPayee WHERE [Active]<>0 ORDER BY Abbreviation", 2, "0;1400", "Payee", 1400
-    DatasheetBox frm.Name, "Label", "Label", 2400
-    DatasheetBox frm.Name, "Amount", "Amount", 1200
-    DatasheetBox frm.Name, "GLCode", "GL", 1200
+    Set frm = OpenGrid("Adjustments", "tblSupplement", 7600)
+    HideKey frm.Name, "EventID"
+    GridHead frm.Name, "lblPayee", "Payee", 40, 1600
+    GridHead frm.Name, "lblLabel", "Label", 1680, 2800
+    GridHead frm.Name, "lblAmount", "Amount", 4520, 1500
+    GridHead frm.Name, "lblGL", "GL", 6060, 1400
+    GridCombo frm.Name, "PayeeID", 40, 1600, "Table/Query", "SELECT PayeeID, Abbreviation FROM tblPayee WHERE [Active]<>0 ORDER BY Abbreviation", 2, "0;1400"
+    GridCell frm.Name, "Label", 1680, 2800, False
+    GridCell frm.Name, "Amount", 4520, 1500, True
+    GridCell frm.Name, "GLCode", 6060, 1400, False
     SaveObject acForm, frm.Name, "fsubSupplement"
 End Sub
 
 Private Sub BuildStaff()
     Dim frm As Form
-    Set frm = CreateForm()
-    frm.Caption = "Staff tips"
-    frm.RecordSource = "tblStaffTip"
-    UseDatasheet frm
+    Set frm = OpenGrid("Staff tips", "tblStaffTip", 7500)
     frm.AllowAdditions = False
     frm.AllowEdits = False
     frm.AllowDeletions = False
-    DatasheetBox frm.Name, "LocationName", "Stand", 2800
-    DatasheetBox frm.Name, "SlotNo", "#", 700
-    DatasheetBox frm.Name, "PersonName", "Person", 1800
-    DatasheetBox frm.Name, "Amount", "Amount", 1100
-    DatasheetBox frm.Name, "PoolAmount", "Pool", 1200
-    DatasheetBox frm.Name, "HeldBack", "Held", 1100
+    HideKey frm.Name, "EventID"
+    GridHead frm.Name, "lblStand", "Stand", 40, 2000
+    GridHead frm.Name, "lblSlot", "#", 2080, 500
+    GridHead frm.Name, "lblPerson", "Person", 2620, 1600
+    GridHead frm.Name, "lblAmount", "Amount", 4260, 1000
+    GridHead frm.Name, "lblPool", "Pool", 5300, 1000
+    GridHead frm.Name, "lblHeld", "Held", 6340, 1000
+    GridCell frm.Name, "LocationName", 40, 2000, False
+    GridCell frm.Name, "SlotNo", 2080, 500, False
+    GridCell frm.Name, "PersonName", 2620, 1600, False
+    GridCell frm.Name, "Amount", 4260, 1000, True
+    GridCell frm.Name, "PoolAmount", 5300, 1000, True
+    GridCell frm.Name, "HeldBack", 6340, 1000, True
     SaveObject acForm, frm.Name, "fsubStaff"
 End Sub
 
@@ -665,9 +865,11 @@ End Sub
 Private Sub DatasheetControl(ByVal formName As String, ByVal controlKind As Long, ByVal fieldName As String, ByVal caption As String, ByVal width As Long, ByVal sourceType As String, ByVal source As String, ByVal columns As Long, ByVal widths As String)
     Dim host As Object
     Dim ctl As Control
+    Dim lbl As Control
     Dim before As Long
     Dim index As Long
     Dim kept As String
+    Dim found As Boolean
     Set host = Forms(formName)
     before = host.Controls.Count
     Set ctl = CreateControl(formName, controlKind, acDetail, "", fieldName, 0, 0, width, 300)
@@ -693,14 +895,19 @@ Private Sub DatasheetControl(ByVal formName As String, ByVal controlKind As Long
     ElseIf IsMoneyField(fieldName) Then
         ctl.Format = "Currency"
     End If
+    found = False
     For index = host.Controls.Count - 1 To before Step -1
         If host.Controls(index).Name <> kept Then
             host.Controls(index).Caption = caption
             host.Controls(index).Name = "lbl" & fieldName
-            Exit Sub
+            found = True
+            Exit For
         End If
     Next index
-    ctl.Name = ColumnToken(caption, fieldName)
+    If found Then Exit Sub
+    Set lbl = CreateControl(formName, acLabel, acDetail, ctl.Name, "", 0, 0, width, 200)
+    lbl.Caption = caption
+    lbl.Name = "lbl" & fieldName
 End Sub
 
 Private Function IsMoneyField(ByVal fieldName As String) As Boolean
@@ -727,6 +934,12 @@ Private Sub UseDatasheet(ByVal frm As Form)
     frm.DefaultView = 2
     frm.DatasheetFontName = "Calibri"
     frm.DatasheetFontHeight = 10
+    On Error Resume Next
+    frm.DatasheetBackColor = vbWhite
+    frm.DatasheetForeColor = RGB(24, 49, 78)
+    frm.DatasheetGridlinesColor = RGB(196, 202, 210)
+    frm.DatasheetAlternateBackColor = RGB(245, 247, 250)
+    On Error GoTo 0
 End Sub
 
 Private Sub TitleLabel(ByVal reportName As String, ByVal controlName As String, ByVal caption As String, ByVal y As Long, ByVal size As Single)

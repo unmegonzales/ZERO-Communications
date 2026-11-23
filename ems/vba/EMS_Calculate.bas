@@ -347,6 +347,22 @@ Private Function RoleOf(ByVal text As String) As String
     End Select
 End Function
 
+Public Function EMSRemoveStand()
+    Dim child As Object
+    On Error GoTo Failed
+    If Not CurrentProject.AllForms("frmEvent").IsLoaded Then Exit Function
+    Set child = Forms!frmEvent!fsubAssign.Form
+    If child.NewRecord Then Exit Function
+    If MsgBox("Remove " & Nz(child!LocationName, "this stand") & " from the event?", vbYesNo + vbQuestion) <> vbYes Then Exit Function
+    child.AllowDeletions = True
+    If child.Dirty Then child.Dirty = False
+    child.Recordset.Delete
+    child.Requery
+    Exit Function
+Failed:
+    MsgBox Err.Description, vbExclamation
+End Function
+
 Public Function EMSNewEvent()
     If CurrentProject.AllForms("frmEvent").IsLoaded Then DoCmd.Close acForm, "frmEvent"
     DoCmd.OpenForm "frmEvent", , , , acFormAdd
