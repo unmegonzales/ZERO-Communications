@@ -37,6 +37,7 @@ Public Sub BuildEMS()
     BuildStatement
     SetTextProperty "StartupForm", "frmHub"
     SetTextProperty "AppTitle", "EMS Payouts"
+    EMSEnsurePartners
     DoCmd.Echo True
     DoCmd.Hourglass False
     MsgBox "EMS is ready." & vbCrLf & "Close this database and open it again. The event list is the first screen." & vbCrLf & _

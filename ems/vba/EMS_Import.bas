@@ -5,19 +5,19 @@ Option Explicit
 ' Reads the two raw MyVenue exports. A new pair creates the event.
 ' Importing onto an open event replaces the sales and tips and keeps assignments.
 
-Public Sub EMSImportNew()
+Public Function EMSImportNew()
     EMSImportPair 0
-End Sub
+End Function
 
-Public Sub EMSImportCurrent()
+Public Function EMSImportCurrent()
     If Not CurrentProject.AllForms("frmEvent").IsLoaded Then
         MsgBox "Open an event first.", vbInformation
-        Exit Sub
+        Exit Function
     End If
     If Forms!frmEvent.Dirty Then Forms!frmEvent.Dirty = False
     EMSImportPair CLng(Nz(Forms!frmEvent!EventID, 0))
     EMSEventRefresh
-End Sub
+End Function
 
 Public Sub EMSImportPair(ByVal eventId As Long)
     On Error GoTo Failed

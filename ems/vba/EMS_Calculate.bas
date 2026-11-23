@@ -6,12 +6,12 @@ Option Explicit
 ' checks still calculate. A new event can be typed with no MyVenue file;
 ' stands added by hand use the nets on the row.
 
-Public Sub EMSCalculateCurrent()
-    If Not CurrentProject.AllForms("frmEvent").IsLoaded Then Exit Sub
+Public Function EMSCalculateCurrent()
+    If Not CurrentProject.AllForms("frmEvent").IsLoaded Then Exit Function
     If Forms!frmEvent.Dirty Then Forms!frmEvent.Dirty = False
     EMSCalculateEvent CLng(Nz(Forms!frmEvent!EventID, 0))
     EMSEventRefresh
-End Sub
+End Function
 
 Public Sub EMSCalculateEvent(ByVal eventId As Long)
     On Error GoTo Failed
@@ -313,10 +313,10 @@ Private Function RoleOf(ByVal text As String) As String
     End Select
 End Function
 
-Public Sub EMSNewEvent()
+Public Function EMSNewEvent()
     If CurrentProject.AllForms("frmEvent").IsLoaded Then DoCmd.Close acForm, "frmEvent"
     DoCmd.OpenForm "frmEvent", , , , acFormAdd
-End Sub
+End Function
 
 Public Function EMSEventOpen()
     On Error Resume Next
@@ -362,15 +362,15 @@ Public Sub EMSEventRefresh()
     Forms!frmEvent!txtDue.Requery
 End Sub
 
-Public Sub EMSDeleteEvent()
+Public Function EMSDeleteEvent()
     Dim eventId As Long
-    If Not CurrentProject.AllForms("frmEvent").IsLoaded Then Exit Sub
+    If Not CurrentProject.AllForms("frmEvent").IsLoaded Then Exit Function
     eventId = CLng(Nz(Forms!frmEvent!EventID, 0))
     If eventId = 0 Then
         DoCmd.Close acForm, "frmEvent"
-        Exit Sub
+        Exit Function
     End If
-    If MsgBox("Delete this event and its imported sales, assignments, and statements?", vbYesNo + vbQuestion) <> vbYes Then Exit Sub
+    If MsgBox("Delete this event and its imported sales, assignments, and statements?", vbYesNo + vbQuestion) <> vbYes Then Exit Function
     Exec "DELETE FROM tblInvoiceLine WHERE InvoiceID In (SELECT InvoiceID FROM tblInvoice WHERE EventID=" & eventId & ")"
     Exec "DELETE FROM tblInvoice WHERE EventID=" & eventId
     Exec "DELETE FROM tblStaffTip WHERE EventID=" & eventId
@@ -384,9 +384,10 @@ Public Sub EMSDeleteEvent()
     Exec "DELETE FROM tblEvent WHERE EventID=" & eventId
     DoCmd.Close acForm, "frmEvent"
     If CurrentProject.AllForms("frmHub").IsLoaded Then EMSHubSearch
-End Sub
+End Function
 
 Public Function EMSHubSearch()
+    EMSEnsurePartners
     Dim sql As String
     Dim findText As String
     sql = "SELECT e.EventID, e.EventDate AS [Date], e.EventName AS [Event], e.EventType AS [Type], (SELECT Nz(Sum(i.AmountDue),0) FROM tblInvoice AS i WHERE i.EventID=e.EventID) AS [Amount due] FROM tblEvent AS e WHERE 1=1"
@@ -411,12 +412,155 @@ Public Function EMSOpenSelected()
     DoCmd.OpenForm "frmEvent", , , "EventID=" & eventId
 End Function
 
-Public Sub EMSBackToEvents()
+Public Function EMSBackToEvents()
     DoCmd.Close acForm, "frmEvent"
     If Not CurrentProject.AllForms("frmHub").IsLoaded Then DoCmd.OpenForm "frmHub"
     EMSHubSearch
+End Function
+
+Public Function EMSOpenPayees()
+    Dim added As Long
+    added = EMSEnsurePartners()
+    DoCmd.OpenForm "frmPayee"
+    If added > 0 Then MsgBox added & " payee(s) from the prior database were added.", vbInformation
+End Function
+
+' Inserts the nonprofit and vendor records from the prior payout file.
+' An abbreviation that is already here is left in place. Returns how many were added.
+Public Function EMSEnsurePartners() As Long
+    Dim added As Long
+    Dim payeeId As Long
+    payeeId = EnsurePayee("Albuquerque Rebels Volleyball Club", "NPO", "ARVC", "7800 LAS LOMITAS AVENUE NE", "Albuquerque, NM 87113-2645", "1013051", "5487", "Senobia Szuch", True, added)
+    EnsureEmail payeeId, "gabe.padilla07@yahoo.com", "Primary", True
+    EnsureEmail payeeId, "jillianshane@sbcglobal.net", "Additional", False
+    EnsureNpoRates payeeId
+    payeeId = EnsurePayee("Duke City Volleyball Athletics Inc", "NPO", "DCVA", "8717 DEMOCRACY NE", "Albuquerque, NM 87109-5183", "1026871", "10468", "Shannon Mick", True, added)
+    EnsureEmail payeeId, "fundraising@dcvanm.com", "Primary", True
+    EnsureNpoRates payeeId
+    payeeId = EnsurePayee("APS - Rio Grande High School", "NPO", "RGHS", "2300 ARENAL RD SW", "Albuquerque, NM 87105-4180", "1029380", "11037", "Chris Smalls", True, added)
+    EnsureEmail payeeId, "christopher.smalls@aps.edu", "Primary", True
+    EnsureNpoRates payeeId
+    payeeId = EnsurePayee("58 SOW TOP 3 ASSOCIATION", "NPO", "USAF", "5249 HERCULES WY SE", "Albuquerque, NM 87117-0001", "1031810", "11773", "Daniel Gonzalez", True, added)
+    EnsureEmail payeeId, "daniel.gonzalez.23@us.af.mil", "Primary", True
+    EnsureNpoRates payeeId
+    payeeId = EnsurePayee("APS - Del Norte High School Cheer", "NPO", "DNHS", "", "", "1027902", "10743", "", True, added)
+    EnsureNpoRates payeeId
+    payeeId = EnsurePayee("DJCF INC. (DBA: E3VB)", "NPO", "E3VB", "6919 LUZ DEL SOL PL NW", "Albuquerque, NM 87114-3702", "1031901", "11793", "Sarah Pulling", True, added)
+    EnsureEmail payeeId, "smith5411@gmail.com", "Primary", True
+    EnsureNpoRates payeeId
+    payeeId = EnsurePayee("VICTORY OUTREACH INC., ROSWELL", "NPO", "VOUTREACH", "", "", "1029375", "11040", "", True, added)
+    EnsureNpoRates payeeId
+    payeeId = EnsurePayee("UNITED FIT", "NPO", "UF", "", "", "982165", "5190", "", True, added)
+    EnsureNpoRates payeeId
+    payeeId = EnsurePayee("Fuego Enterprises LLC", "SUB", "LAG", "7770 JEFFERSON ST NE STE 302", "Albuquerque, NM 87109-4386", "992855", "5177", "FAlvarez", True, added)
+    EnsureEmail payeeId, "FAlvarez@fuegonm.com", "Primary", True
+    RepairLagunaRates payeeId
+    payeeId = EnsurePayee("NXTLVL HOLDINGS LLC SUGAR SHIVERS", "SUB", "SUGAR", "533 61ST ST NW", "Albuquerque, NM 87105-1407", "1037451", "13470", "Victor Martiez", True, added)
+    EnsureEmail payeeId, "nxtlevelholdingsllc@gmail.com", "Primary", True
+    EnsureSubRates payeeId, 0.8, 0.1, 0, 0, #1/1/2026#, Null
+    payeeId = EnsurePayee("BNW Enterprises LLC", "SUB", "NOOD", "", "", "", "", "", True, added)
+    EnsureSubRates payeeId, 0.9, 0.1, 0, 0, #1/1/2026#, Null
+    payeeId = EnsurePayee("OHANA FOODS LLC", "SUB", "OHANA", "130 DEER PARK DR", "Alto, NM 88312-8029", "1030237", "", "Mike Walker", True, added)
+    EnsureEmail payeeId, "wok1004@hotmail.com", "Primary", True
+    EnsureSubRates payeeId, 0.9, 0.1, 0, 0, #1/1/2026#, Null
+    payeeId = EnsurePayee("NXTLVL HOLDINGS LLC", "SUB", "SUG", "", "", "1037451", "10809", "", True, added)
+    EnsureSubRates payeeId, 0.8, 0.1, 0, 0, #9/1/2026#, Null
+    EMSEnsurePartners = added
+End Function
+
+Private Function EnsurePayee(ByVal payeeName As String, ByVal payeeType As String, ByVal abbreviation As String, ByVal address1 As String, ByVal address2 As String, ByVal sapId As String, ByVal bssId As String, ByVal contact As String, ByVal isActive As Boolean, ByRef added As Long) As Long
+    Dim id As Variant
+    Dim noteText As String
+    If abbreviation = "VOUTREACH" Then
+        id = Scalar("SELECT PayeeID FROM tblPayee WHERE Abbreviation='VICT'")
+        If Not IsNull(id) Then Exec "UPDATE tblPayee SET Abbreviation='VOUTREACH' WHERE PayeeID=" & id
+    End If
+    id = Scalar("SELECT PayeeID FROM tblPayee WHERE Abbreviation=" & SqlText(abbreviation))
+    noteText = ""
+    If Len(contact) > 0 Then noteText = "Primary contact: " & contact
+    If abbreviation = "DNHS" Or abbreviation = "VOUTREACH" Then
+        If Len(noteText) > 0 Then noteText = noteText & ". "
+        noteText = noteText & "Inactive in the prior database."
+    End If
+    If abbreviation = "SUG" Then noteText = "Earlier Sugar Shivers contract. Current payee abbreviation is SUGAR."
+    If abbreviation = "OHANA" Then noteText = "Primary contact: Mike Walker. Prior database also used abbreviation NOOD."
+    If IsNull(id) Then
+        Exec "INSERT INTO tblPayee (PayeeName, PayeeType, Abbreviation, Address1, Address2, SAPID, BSSID, Phone, Notes, Active) VALUES (" & _
+            SqlText(payeeName) & "," & SqlText(payeeType) & "," & SqlText(abbreviation) & "," & SqlText(address1) & "," & SqlText(address2) & "," & _
+            SqlText(sapId) & "," & SqlText(bssId) & ",''," & SqlText(noteText) & "," & IIf(isActive, "-1", "0") & ")"
+        id = Scalar("SELECT PayeeID FROM tblPayee WHERE Abbreviation=" & SqlText(abbreviation))
+        added = added + 1
+    Else
+        FillBlank "tblPayee", "Address1", address1, CLng(id)
+        FillBlank "tblPayee", "Address2", address2, CLng(id)
+        FillBlank "tblPayee", "SAPID", sapId, CLng(id)
+        FillBlank "tblPayee", "BSSID", bssId, CLng(id)
+        FillBlank "tblPayee", "Notes", noteText, CLng(id)
+    End If
+    EnsurePayee = CLng(id)
+End Function
+
+Private Sub FillBlank(ByVal tableName As String, ByVal fieldName As String, ByVal value As String, ByVal payeeId As Long)
+    If Len(value) = 0 Then Exit Sub
+    Exec "UPDATE " & tableName & " SET " & fieldName & "=" & SqlText(value) & " WHERE PayeeID=" & payeeId & " AND (" & fieldName & " Is Null OR " & fieldName & "='')"
 End Sub
 
-Public Sub EMSOpenPayees()
-    DoCmd.OpenForm "frmPayee"
+Private Sub EnsureEmail(ByVal payeeId As Long, ByVal address As String, ByVal label As String, ByVal isPrimary As Boolean)
+    If Len(address) = 0 Then Exit Sub
+    If Not IsNull(Scalar("SELECT EmailID FROM tblPayeeEmail WHERE PayeeID=" & payeeId & " AND EmailAddress=" & SqlText(address))) Then Exit Sub
+    Exec "INSERT INTO tblPayeeEmail (PayeeID, EmailAddress, Label, IsPrimary) VALUES (" & payeeId & "," & SqlText(address) & "," & SqlText(label) & "," & IIf(isPrimary, "-1", "0") & ")"
 End Sub
+
+Private Sub EnsureNpoRates(ByVal payeeId As Long)
+    EnsureRate payeeId, "DONATION_FOOD", 0.1, #1/1/2026#, Null
+    EnsureRate payeeId, "DONATION_ALCOHOL", 0.08, #1/1/2026#, Null
+    EnsureRate payeeId, "TIP_WITHHOLD", 0.1, #1/1/2026#, Null
+End Sub
+
+Private Sub EnsureSubRates(ByVal payeeId As Long, ByVal foodRate As Double, ByVal naRate As Double, ByVal beerRate As Double, ByVal liquorRate As Double, ByVal startOn As Date, ByVal endOn As Variant)
+    EnsureRate payeeId, "FOOD", foodRate, startOn, endOn
+    EnsureRate payeeId, "NA", naRate, startOn, endOn
+    EnsureRate payeeId, "BEER", beerRate, startOn, endOn
+    EnsureRate payeeId, "LIQUOR", liquorRate, startOn, endOn
+    EnsureRate payeeId, "TIP_WITHHOLD", 0.1, startOn, endOn
+    EnsureRate payeeId, "CARD_FEE", 0.03, startOn, endOn
+    EnsureRate payeeId, "ICE_PER_BAG", 3, startOn, endOn
+End Sub
+
+Private Sub RepairLagunaRates(ByVal payeeId As Long)
+    Dim foodId As Variant
+    Dim tipId As Variant
+    foodId = Scalar("SELECT RateID FROM tblPayeeRate WHERE PayeeID=" & payeeId & " AND RateCode='FOOD' AND Abs(RateAmount-0.7)<0.000001 AND EndDate Is Null AND EffectiveDate=#01/01/2026#")
+    If Not IsNull(foodId) Then
+        Exec "UPDATE tblPayeeRate SET RateAmount=0.8, EndDate=#10/17/2026# WHERE RateID=" & foodId
+    End If
+    tipId = Scalar("SELECT RateID FROM tblPayeeRate WHERE PayeeID=" & payeeId & " AND RateCode='TIP_WITHHOLD' AND Abs(RateAmount-0.1)<0.000001 AND EndDate Is Null AND EffectiveDate=#01/01/2026#")
+    If Not IsNull(tipId) Then
+        Exec "UPDATE tblPayeeRate SET RateAmount=0, EndDate=#10/17/2026# WHERE RateID=" & tipId
+    End If
+    EnsureRate payeeId, "FOOD", 0.8, #1/1/2026#, #10/17/2026#
+    EnsureRate payeeId, "FOOD", 0.7, #10/18/2026#, Null
+    EnsureRate payeeId, "NA", 0.05, #1/1/2026#, Null
+    EnsureRate payeeId, "BEER", 0, #1/1/2026#, Null
+    EnsureRate payeeId, "LIQUOR", 0, #1/1/2026#, Null
+    EnsureRate payeeId, "TIP_WITHHOLD", 0, #1/1/2026#, #10/17/2026#
+    EnsureRate payeeId, "TIP_WITHHOLD", 0.1, #10/18/2026#, Null
+    EnsureRate payeeId, "CARD_FEE", 0.03, #1/1/2026#, Null
+    EnsureRate payeeId, "ICE_PER_BAG", 3, #1/1/2026#, Null
+End Sub
+
+Private Sub EnsureRate(ByVal payeeId As Long, ByVal code As String, ByVal amount As Double, ByVal startOn As Date, ByVal endOn As Variant)
+    Dim endSql As String
+    If Not IsNull(Scalar("SELECT RateID FROM tblPayeeRate WHERE PayeeID=" & payeeId & " AND RateCode=" & SqlText(code) & " AND EffectiveDate=" & SqlHash(startOn))) Then Exit Sub
+    If IsNull(endOn) Then endSql = "Null" Else endSql = SqlHash(CDate(endOn))
+    Exec "INSERT INTO tblPayeeRate (PayeeID, RateCode, RateAmount, EffectiveDate, EndDate, Notes) VALUES (" & _
+        payeeId & "," & SqlText(code) & "," & SqlRate(amount) & "," & SqlHash(startOn) & "," & endSql & ",'')"
+End Sub
+
+Private Function SqlHash(ByVal day As Date) As String
+    SqlHash = "#" & Format$(day, "mm/dd/yyyy") & "#"
+End Function
+
+Private Function SqlRate(ByVal amount As Double) As String
+    SqlRate = Replace$(Format$(amount, "0.000000"), ",", ".")
+End Function

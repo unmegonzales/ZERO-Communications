@@ -2,19 +2,19 @@ Attribute VB_Name = "EMS_Output"
 Option Compare Database
 Option Explicit
 
-Public Sub EMSPreviewCurrent()
+Public Function EMSPreviewCurrent()
     Dim invoiceId As Long
     invoiceId = SelectedInvoice()
-    If invoiceId = 0 Then Exit Sub
+    If invoiceId = 0 Then Exit Function
     EMSFillStatement invoiceId
     DoCmd.OpenReport "rptStatement", acViewPreview
-End Sub
+End Function
 
-Public Sub EMSExportCurrent()
+Public Function EMSExportCurrent()
     Dim rs As Object
     Dim count As Long
     Dim folder As String
-    If Nz(Forms!frmEvent!EventID, 0) = 0 Then Exit Sub
+    If Nz(Forms!frmEvent!EventID, 0) = 0 Then Exit Function
     If Forms!frmEvent.Dirty Then Forms!frmEvent.Dirty = False
     Set rs = CurrentDb.OpenRecordset("SELECT InvoiceID FROM tblInvoice WHERE EventID=" & Forms!frmEvent!EventID, EMS_SNAPSHOT)
     folder = EMSFolder()
@@ -29,12 +29,12 @@ Public Sub EMSExportCurrent()
     Else
         MsgBox count & " portrait statement(s) saved in" & vbCrLf & folder, vbInformation
     End If
-End Sub
+End Function
 
-Public Sub EMSEmailCurrent()
+Public Function EMSEmailCurrent()
     Dim rs As Object
     Dim count As Long
-    If Nz(Forms!frmEvent!EventID, 0) = 0 Then Exit Sub
+    If Nz(Forms!frmEvent!EventID, 0) = 0 Then Exit Function
     If Forms!frmEvent.Dirty Then Forms!frmEvent.Dirty = False
     Set rs = CurrentDb.OpenRecordset("SELECT InvoiceID FROM tblInvoice WHERE EventID=" & Forms!frmEvent!EventID, EMS_SNAPSHOT)
     Do While Not rs.EOF
@@ -44,7 +44,7 @@ Public Sub EMSEmailCurrent()
     Loop
     rs.Close
     If count = 0 Then MsgBox "Calculate the event before emailing.", vbInformation
-End Sub
+End Function
 
 Public Sub EMSEmailInvoice(ByVal invoiceId As Long)
     On Error GoTo Failed

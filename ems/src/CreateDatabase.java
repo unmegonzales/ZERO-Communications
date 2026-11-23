@@ -302,15 +302,31 @@ public class CreateDatabase {
         int laguna = payee(db, "Fuego Enterprises LLC", "SUB", "LAG",
                 "7770 JEFFERSON ST NE STE 302", "Albuquerque, NM 87109-4386", "992855", "5177");
         email(db, laguna, "FAlvarez@fuegonm.com", "Primary", true);
-        subRates(db, laguna, "0.70", "0.05", "0", "0");
+        rateThrough(db, laguna, "FOOD", "0.80", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 10, 17));
+        rateThrough(db, laguna, "FOOD", "0.70", LocalDate.of(2026, 10, 18), null);
+        rateThrough(db, laguna, "NA", "0.05", LocalDate.of(2026, 1, 1), null);
+        rateThrough(db, laguna, "BEER", "0", LocalDate.of(2026, 1, 1), null);
+        rateThrough(db, laguna, "LIQUOR", "0", LocalDate.of(2026, 1, 1), null);
+        rateThrough(db, laguna, "TIP_WITHHOLD", "0", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 10, 17));
+        rateThrough(db, laguna, "TIP_WITHHOLD", "0.10", LocalDate.of(2026, 10, 18), null);
+        rateThrough(db, laguna, "CARD_FEE", "0.03", LocalDate.of(2026, 1, 1), null);
+        rateThrough(db, laguna, "ICE_PER_BAG", "3", LocalDate.of(2026, 1, 1), null);
 
         int sugar = payee(db, "NXTLVL HOLDINGS LLC SUGAR SHIVERS", "SUB", "SUGAR",
                 "533 61ST ST NW", "Albuquerque, NM 87105-1407", "1037451", "13470");
         email(db, sugar, "nxtlevelholdingsllc@gmail.com", "Primary", true);
         subRates(db, sugar, "0.80", "0.10", "0", "0");
 
+        int earlierSugar = payee(db, "NXTLVL HOLDINGS LLC", "SUB", "SUG", "", "", "1037451", "10809");
+        subRates(db, earlierSugar, "0.80", "0.10", "0", "0");
+
         int nood = payee(db, "BNW Enterprises LLC", "SUB", "NOOD", "", "", "", "");
         subRates(db, nood, "0.90", "0.10", "0", "0");
+
+        int ohana = payee(db, "OHANA FOODS LLC", "SUB", "OHANA",
+                "130 DEER PARK DR", "Alto, NM 88312-8029", "1030237", "");
+        email(db, ohana, "wok1004@hotmail.com", "Primary", true);
+        subRates(db, ohana, "0.90", "0.10", "0", "0");
 
         Table locs = db.getTable("tblLocation");
         for (String line : Files.readAllLines(locations)) {
@@ -355,8 +371,12 @@ public class CreateDatabase {
     }
 
     private static void rate(Database db, int payeeId, String code, String amount) throws Exception {
+        rateThrough(db, payeeId, code, amount, LocalDate.of(2026, 1, 1), null);
+    }
+
+    private static void rateThrough(Database db, int payeeId, String code, String amount, LocalDate start, LocalDate end) throws Exception {
         db.getTable("tblPayeeRate").addRow(null, payeeId, code, Double.valueOf(amount),
-                local(LocalDate.of(2026, 1, 1)), null, "");
+                local(start), end == null ? null : local(end), "");
     }
 
     private static ColumnBuilder auto(String name) {
