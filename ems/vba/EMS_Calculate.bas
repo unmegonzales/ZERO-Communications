@@ -282,7 +282,8 @@ Private Sub VendorCosts(ByVal eventId As Long, ByVal payeeId As Long, ByVal even
     ice = 0
     shortage = 0
     other = 0
-    Set rs = CurrentDb.OpenRecordset("SELECT Nz(Sum(CashTender),0) AS CashTender, Nz(Sum(CardTender),0) AS CardTender, Nz(Sum(CorporateVoucher),0) AS CorporateVoucher, Nz(Sum(LevyNfpVoucher),0) AS LevyNfpVoucher, Nz(Sum(UnmGuestVoucher),0) AS UnmGuestVoucher, Nz(Sum(IceBags),0) AS IceBags, Nz(Sum(OtherExpense),0) AS OtherExpense FROM tblVendorInput WHERE EventID=" & eventId & " AND PayeeID=" & payeeId, EMS_SNAPSHOT)
+    EMSEnsureIceColumn
+    Set rs = CurrentDb.OpenRecordset("SELECT Nz(Sum(CashTender),0) AS CashTender, Nz(Sum(CardTender),0) AS CardTender, Nz(Sum(CorporateVoucher),0) AS CorporateVoucher, Nz(Sum(LevyNfpVoucher),0) AS LevyNfpVoucher, Nz(Sum(UnmGuestVoucher),0) AS UnmGuestVoucher, Nz(Sum(IceAmount),0) AS IceAmount, Nz(Sum(OtherExpense),0) AS OtherExpense FROM tblVendorInput WHERE EventID=" & eventId & " AND PayeeID=" & payeeId, EMS_SNAPSHOT)
     If rs.EOF Then
         rs.Close
         cardFee = MoneyProduct(net, RateOn(payeeId, "CARD_FEE", eventDay, 0.03))
@@ -290,11 +291,35 @@ Private Sub VendorCosts(ByVal eventId As Long, ByVal payeeId As Long, ByVal even
     End If
     tenders = CCur(rs!CashTender) + CCur(rs!CardTender) + CCur(rs!CorporateVoucher) + CCur(rs!LevyNfpVoucher) + CCur(rs!UnmGuestVoucher)
     If tenders <> 0 And tenders < gross Then shortage = gross - tenders
-    ice = MoneyProduct(CCur(rs!IceBags), RateOn(payeeId, "ICE_PER_BAG", eventDay, 3))
+    ice = CCur(rs!IceAmount)
     other = CCur(rs!OtherExpense)
     cardFee = MoneyProduct(net, RateOn(payeeId, "CARD_FEE", eventDay, 0.03))
     rs.Close
 End Sub
+
+Public Function EMSEnsureIceColumn()
+    On Error Resume Next
+    CurrentDb.TableDefs("tblVendorInput").Fields("IceAmount").Name
+    If Err.Number <> 0 Then
+        Err.Clear
+        CurrentDb.Execute "ALTER TABLE tblVendorInput ADD COLUMN IceAmount CURRENCY"
+    End If
+    On Error GoTo 0
+End Function
+
+Public Function EMSRateTyped()
+    Dim amount As Double
+    If Not IsNumeric(Screen.ActiveControl.Value) Then Exit Function
+    amount = CDbl(Screen.ActiveControl.Value)
+    If amount > 1 Then Screen.ActiveControl.Value = amount / 100
+End Function
+
+Public Function EMSBulkPayees()
+    If CurrentProject.AllForms("frmPayee").IsLoaded Then
+        If Forms!frmPayee.Dirty Then Forms!frmPayee.Dirty = False
+    End If
+    DoCmd.OpenTable "tblPayee", acViewNormal, acEdit
+End Function
 
 Private Sub AddCalculatedSupplement(ByVal eventId As Long, ByVal payeeId As Long, ByVal label As String, ByVal amount As Currency, ByVal glCode As String)
     Exec "INSERT INTO tblSupplement (EventID, PayeeID, Label, Amount, GLCode) VALUES (" & eventId & "," & payeeId & "," & SqlText(label) & "," & amount & "," & SqlText(glCode) & ")"
@@ -626,7 +651,6 @@ Private Sub EnsureSubRates(ByVal payeeId As Long, ByVal foodRate As Double, ByVa
     EnsureRate payeeId, "LIQUOR", liquorRate, startOn, endOn
     EnsureRate payeeId, "TIP_WITHHOLD", 0.1, startOn, endOn
     EnsureRate payeeId, "CARD_FEE", 0.03, startOn, endOn
-    EnsureRate payeeId, "ICE_PER_BAG", 3, startOn, endOn
 End Sub
 
 Private Sub RepairLagunaRates(ByVal payeeId As Long)
@@ -648,7 +672,6 @@ Private Sub RepairLagunaRates(ByVal payeeId As Long)
     EnsureRate payeeId, "TIP_WITHHOLD", 0, #1/1/2026#, #10/17/2026#
     EnsureRate payeeId, "TIP_WITHHOLD", 0.1, #10/18/2026#, Null
     EnsureRate payeeId, "CARD_FEE", 0.03, #1/1/2026#, Null
-    EnsureRate payeeId, "ICE_PER_BAG", 3, #1/1/2026#, Null
 End Sub
 
 Private Sub EnsureRate(ByVal payeeId As Long, ByVal code As String, ByVal amount As Double, ByVal startOn As Date, ByVal endOn As Variant)

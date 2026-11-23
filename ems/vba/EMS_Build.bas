@@ -149,15 +149,16 @@ Private Sub BuildPayee()
     frm.OnCurrent = "=EMSPayeeCurrent()"
     EnsureFormHeader frm.Name
     frm.Section(acHeader).Height = 640
-    frm.Section(acHeader).BackColor = RGB(255, 255, 255)
-    frm.Section(acDetail).BackColor = RGB(255, 255, 255)
+    frm.Section(acHeader).BackColor = RGB(232, 236, 240)
+    frm.Section(acDetail).BackColor = RGB(232, 236, 240)
     LabelForm frm.Name, "lblTitle", "Payees", 240, 140, 2200, 400, 20, True
     Set ctl = AddControl(frm.Name, acForm, acCheckBox, acHeader, "chkShowInactive", 2800, 200, 280, 280)
     ctl.DefaultValue = "False"
     ctl.OnClick = "=EMSPayeeFilter()"
     LabelForm frm.Name, "lblInactive", "Show inactive", 3160, 200, 2200, 280, 10, False
-    ButtonForm frm.Name, "cmdEvents", "Events", "=EMSBackToEvents()", 10800, 140, 1600, 400
-    ButtonForm frm.Name, "cmdNew", "New payee", "=GoToNewPayee()", 12600, 140, 1800, 400
+    ButtonForm frm.Name, "cmdHome", "Home", "=EMSBackToEvents()", 7800, 140, 1400, 400
+    ButtonForm frm.Name, "cmdBulk", "Bulk edit vendors", "=EMSBulkPayees()", 9360, 140, 2500, 400
+    ButtonForm frm.Name, "cmdNew", "New payee", "=GoToNewPayee()", 12020, 140, 1800, 400
     Set ctl = AddControl(frm.Name, acForm, acListBox, acDetail, "lstPayees", 240, 80, 14320, 2680)
     ctl.ColumnCount = 7
     ctl.ColumnHeads = True
@@ -166,6 +167,7 @@ Private Sub BuildPayee()
     ctl.RowSource = "SELECT PayeeID AS [ID], PayeeName AS [Payee], PayeeType AS [Type], Abbreviation AS [Abbrev], SAPID AS [SAP ID], BSSID AS [BSS ID], IIf(Active<>0,'Active','Inactive') AS [Status] FROM tblPayee WHERE Active<>0 ORDER BY PayeeName"
     ctl.OnClick = "=EMSPayeePick()"
     ctl.OnDblClick = "=EMSPayeeEdit()"
+    ctl.BackColor = vbWhite
     Paint ctl, 10, False
     ButtonFormDetail frm.Name, "cmdEdit", "Edit", "=EMSPayeeEdit()", 240, 3080, 1500, 400
     ButtonFormDetail frm.Name, "cmdSave", "Save", "=EMSPayeeSave()", 1860, 3080, 1500, 400
@@ -185,7 +187,7 @@ Private Sub BuildPayee()
     PayeeField frm.Name, "txtNotes", "Notes", "Notes", 240, 5520, 14320, True
     LabelDetail frm.Name, "lblEmails", "Emails", 240, 6560, 3000, 280, 12, True
     LabelDetail frm.Name, "lblRates", "Commission rates", 7600, 6560, 4000, 280, 12, True
-    LabelDetail frm.Name, "lblRateHint", "Add a row when a rate changes. Leave Ends blank while it is current.", 7600, 6860, 6800, 240, 9, False
+    LabelDetail frm.Name, "lblRateHint", "Type 10 for 10 percent. Leave Ends blank while the rate is current.", 7600, 6860, 6800, 240, 9, False
     Set ctl = LinkSubform(frm.Name, "fsubEmail", "fsubEmail", 240, 7280, 7000, 2200)
     ctl.BorderStyle = 1
     Set ctl = LinkSubform(frm.Name, "fsubRate", "fsubRate", 7600, 7280, 6960, 2200)
@@ -199,11 +201,14 @@ Public Sub BuildPayeeScreen()
     On Error GoTo Failed
     DoCmd.Hourglass True
     CloseOpenDesign
+    EMSEnsureIceColumn
     DropObject acForm, "frmPayee"
     DropObject acForm, "fsubEmail"
     DropObject acForm, "fsubRate"
+    DropObject acForm, "fsubVendor"
     BuildEmail
     BuildRate
+    BuildVendor
     BuildPayee
     DoCmd.Hourglass False
     DoCmd.OpenForm "frmPayee"
@@ -255,7 +260,7 @@ Private Sub BuildVendor()
     DatasheetBox frm.Name, "CorporateVoucher", "Corporate voucher", 1800
     DatasheetBox frm.Name, "LevyNfpVoucher", "Levy voucher", 1600
     DatasheetBox frm.Name, "UnmGuestVoucher", "UNM voucher", 1600
-    DatasheetBox frm.Name, "IceBags", "Ice bags", 1100
+    DatasheetBox frm.Name, "IceAmount", "Ice", 1200
     DatasheetBox frm.Name, "OtherExpense", "Other", 1200
     SaveObject acForm, frm.Name, "fsubVendor"
 End Sub
@@ -308,6 +313,8 @@ Private Sub BuildRate()
     Set frm = CreateForm()
     frm.Caption = "Rates"
     frm.RecordSource = "tblPayeeRate"
+    frm.Filter = "RateCode<>'ICE_PER_BAG'"
+    frm.FilterOn = True
     UseDatasheet frm
     DatasheetBox frm.Name, "RateCode", "Rate", 2400
     DatasheetBox frm.Name, "RateAmount", "Amount", 1200
@@ -466,6 +473,7 @@ Private Sub CaptionFields()
     FieldCaption "tblVendorInput", "LevyNfpVoucher", "Levy voucher"
     FieldCaption "tblVendorInput", "UnmGuestVoucher", "UNM voucher"
     FieldCaption "tblVendorInput", "IceBags", "Ice bags"
+    FieldCaption "tblVendorInput", "IceAmount", "Ice"
     FieldCaption "tblVendorInput", "OtherExpense", "Other"
     FieldCaption "tblSupplement", "PayeeID", "Payee"
     FieldCaption "tblSupplement", "GLCode", "GL"
@@ -639,7 +647,12 @@ Private Sub DatasheetControl(ByVal formName As String, ByVal controlKind As Long
         ctl.LimitToList = True
     End If
     If InStr(fieldName, "Date") > 0 Then ctl.Format = "Short Date"
-    If fieldName = "RateAmount" Then ctl.Format = "0.00####"
+    If fieldName = "RateAmount" Then
+        ctl.Format = "0%"
+        ctl.AfterUpdate = "=EMSRateTyped()"
+    ElseIf IsMoneyField(fieldName) Then
+        ctl.Format = "Currency"
+    End If
     For index = host.Controls.Count - 1 To before Step -1
         If host.Controls(index).Name <> kept Then
             host.Controls(index).Caption = caption
@@ -649,6 +662,13 @@ Private Sub DatasheetControl(ByVal formName As String, ByVal controlKind As Long
     Next index
     ctl.Name = ColumnToken(caption, fieldName)
 End Sub
+
+Private Function IsMoneyField(ByVal fieldName As String) As Boolean
+    Select Case fieldName
+        Case "CashTender", "CardTender", "CorporateVoucher", "LevyNfpVoucher", "UnmGuestVoucher", "IceAmount", "OtherExpense", "Amount", "PoolAmount", "HeldBack", "CookFee", "Bonus", "Shortage", "Cleaning", "PosSales", "FoodNet", "NaNet", "AlcoholNet", "PosTips"
+            IsMoneyField = True
+    End Select
+End Function
 
 Private Function ColumnToken(ByVal caption As String, ByVal fieldName As String) As String
     Dim result As String

@@ -143,6 +143,7 @@ public class CreateDatabase {
                 money("LevyNfpVoucher"),
                 money("UnmGuestVoucher"),
                 dbl("IceBags"),
+                money("IceAmount"),
                 money("OtherExpense"));
         table(db, "tblInvoice",
                 auto("InvoiceID"),
@@ -310,7 +311,6 @@ public class CreateDatabase {
         rateThrough(db, laguna, "TIP_WITHHOLD", "0", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 10, 17));
         rateThrough(db, laguna, "TIP_WITHHOLD", "0.10", LocalDate.of(2026, 10, 18), null);
         rateThrough(db, laguna, "CARD_FEE", "0.03", LocalDate.of(2026, 1, 1), null);
-        rateThrough(db, laguna, "ICE_PER_BAG", "3", LocalDate.of(2026, 1, 1), null);
 
         int sugar = payee(db, "NXTLVL HOLDINGS LLC SUGAR SHIVERS", "SUB", "SUGAR",
                 "533 61ST ST NW", "Albuquerque, NM 87105-1407", "1037451", "13470");
@@ -367,7 +367,6 @@ public class CreateDatabase {
         rate(db, payeeId, "LIQUOR", liquor);
         rate(db, payeeId, "TIP_WITHHOLD", "0.10");
         rate(db, payeeId, "CARD_FEE", "0.03");
-        rate(db, payeeId, "ICE_PER_BAG", "3");
     }
 
     private static void rate(Database db, int payeeId, String code, String amount) throws Exception {
