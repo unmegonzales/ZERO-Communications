@@ -522,9 +522,9 @@ Public Function EMSPayeeFilter()
     Dim frm As Object
     Dim sql As String
     Set frm = Forms!frmPayee
-    sql = "SELECT PayeeID AS [ID], PayeeName AS [Payee], PayeeType AS [Type], Abbreviation AS [Abbrev], SAPID AS [SAP ID], BSSID AS [BSS ID], IIf(Active<>0,'Active','Inactive') AS [Status] FROM tblPayee"
-    If Not Nz(frm!chkShowInactive, False) Then sql = sql & " WHERE Active<>0"
-    frm!lstPayees.RowSource = sql & " ORDER BY PayeeName"
+    sql = "SELECT p.PayeeID AS [ID], p.PayeeName AS [Payee], p.PayeeType AS [Type], p.Abbreviation AS [Abbrev], p.SAPID AS [SAP ID], p.BSSID AS [BSS ID], IIf(p.Active<>0,'Active','Inactive') AS [Status] FROM tblPayee AS p"
+    If Not Nz(frm!chkShowInactive, False) Then sql = sql & " WHERE p.Active<>0"
+    frm!lstPayees.RowSource = sql & " ORDER BY p.PayeeName"
     If Not IsNull(frm!PayeeID) Then frm!lstPayees = frm!PayeeID
 End Function
 

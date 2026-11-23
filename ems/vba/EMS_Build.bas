@@ -164,7 +164,7 @@ Private Sub BuildPayee()
     ctl.ColumnHeads = True
     ctl.ColumnWidths = "700;4600;1100;1300;1900;1500;1400"
     ctl.BoundColumn = 1
-    ctl.RowSource = "SELECT PayeeID AS [ID], PayeeName AS [Payee], PayeeType AS [Type], Abbreviation AS [Abbrev], SAPID AS [SAP ID], BSSID AS [BSS ID], IIf(Active<>0,'Active','Inactive') AS [Status] FROM tblPayee WHERE Active<>0 ORDER BY PayeeName"
+    ctl.RowSource = "SELECT p.PayeeID AS [ID], p.PayeeName AS [Payee], p.PayeeType AS [Type], p.Abbreviation AS [Abbrev], p.SAPID AS [SAP ID], p.BSSID AS [BSS ID], IIf(p.Active<>0,'Active','Inactive') AS [Status] FROM tblPayee AS p WHERE p.Active<>0 ORDER BY p.PayeeName"
     ctl.OnClick = "=EMSPayeePick()"
     ctl.OnDblClick = "=EMSPayeeEdit()"
     ctl.BackColor = vbWhite
