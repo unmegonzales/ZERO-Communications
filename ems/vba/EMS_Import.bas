@@ -68,28 +68,60 @@ Failed:
     MsgBox "Import stopped. Run the import again if this event was only partly loaded." & vbCrLf & Err.Description, vbCritical
 End Sub
 
-Private Sub EnsureImportColumns()
-    EnsureImportColumn "tblImport", "PriceFile", "TEXT(255)"
-    EnsureImportColumn "tblImport", "TipsFile", "TEXT(255)"
-    EnsureImportColumn "tblImport", "ImportedAt", "DATETIME"
-    EnsureImportColumn "tblImport", "IsCurrent", "YESNO"
-    EnsureImportColumn "tblLocation", "Active", "YESNO"
+Private Sub EnsureImportColumns(ByVal db As Object)
+    ' Field types are the engine numbers: 10 text, 8 date, 1 yes/no.
+    ' Adding them here, on this database object, keeps the later row write off SQL.
+    ' SQL against a column just added is what raised "Too few parameters" for IsCurrent.
+    AddColumn db, "tblImport", "PriceFile", 10, 255
+    AddColumn db, "tblImport", "TipsFile", 10, 255
+    AddColumn db, "tblImport", "ImportedAt", 8, 0
+    AddColumn db, "tblImport", "IsCurrent", 1, 0
+    AddColumn db, "tblLocation", "Active", 1, 0
 End Sub
 
-Private Sub EnsureImportColumn(ByVal tableName As String, ByVal fieldName As String, ByVal fieldType As String)
+Private Sub AddColumn(ByVal db As Object, ByVal tableName As String, ByVal fieldName As String, ByVal fieldType As Long, ByVal fieldSize As Long)
     Dim td As Object
     Dim fld As Object
-    Dim found As Boolean
-    On Error GoTo Missing
-    Set td = CurrentDb.TableDefs(tableName)
-    For Each fld In td.Fields
-        If StrComp(CStr(fld.Name), fieldName, vbTextCompare) = 0 Then found = True
-    Next fld
-    If found Then Exit Sub
-    CurrentDb.Execute "ALTER TABLE [" & tableName & "] ADD COLUMN [" & fieldName & "] " & fieldType
-    CurrentDb.TableDefs.Refresh
-Missing:
+    Dim existing As Object
+    Dim failure As Long
+    Dim detail As String
+    Set td = db.TableDefs(tableName)
+    td.Fields.Refresh
+    For Each existing In td.Fields
+        If StrComp(CStr(existing.Name), fieldName, vbTextCompare) = 0 Then Exit Sub
+    Next existing
+    On Error Resume Next
+    If fieldSize > 0 Then
+        Set fld = td.CreateField(fieldName, fieldType, fieldSize)
+    Else
+        Set fld = td.CreateField(fieldName, fieldType)
+    End If
+    td.Fields.Append fld
+    failure = Err.Number
+    detail = Err.Description
+    Err.Clear
+    On Error GoTo 0
+    td.Fields.Refresh
+    db.TableDefs.Refresh
+    If failure <> 0 And Not ColumnOnTable(td, fieldName) Then
+        Err.Raise failure, "EMS", "Could not add " & tableName & "." & fieldName & ". " & detail
+    End If
 End Sub
+
+Private Function ColumnOnTable(ByVal td As Object, ByVal fieldName As String) As Boolean
+    Dim existing As Object
+    On Error Resume Next
+    For Each existing In td.Fields
+        If StrComp(CStr(existing.Name), fieldName, vbTextCompare) = 0 Then ColumnOnTable = True
+    Next existing
+End Function
+
+Private Function RowHas(ByVal rs As Object, ByVal fieldName As String) As Boolean
+    Dim index As Long
+    For index = 0 To rs.Fields.Count - 1
+        If StrComp(CStr(rs.Fields(index).Name), fieldName, vbTextCompare) = 0 Then RowHas = True
+    Next index
+End Function
 
 Private Function ResolveEvent(ByVal eventId As Long, ByVal eventName As String, ByVal eventDay As Date, ByRef created As Boolean) As Long
     Dim rs As Object
@@ -141,19 +173,40 @@ Private Function GuessType(ByVal eventName As String) As String
 End Function
 
 Private Function ReplaceReports(ByVal eventId As Long, ByVal pricePath As String, ByVal tipsPath As String, ByVal priceRows As Collection, ByVal tipRows As Collection) As Long
+    Dim db As Object
+    Dim rs As Object
     Dim importId As Long
-    EnsureImportColumns
+    Set db = CurrentDb
+    EnsureImportColumns db
     Exec "DELETE FROM tblSale WHERE EventID=" & eventId
     Exec "DELETE FROM tblTip WHERE EventID=" & eventId
     Exec "DELETE FROM tblInvoiceLine WHERE InvoiceID In (SELECT InvoiceID FROM tblInvoice WHERE EventID=" & eventId & ")"
     Exec "DELETE FROM tblInvoice WHERE EventID=" & eventId
     Exec "DELETE FROM tblStaffTip WHERE EventID=" & eventId
     Exec "DELETE FROM tblException WHERE EventID=" & eventId
-    Exec "UPDATE [tblImport] SET [IsCurrent]=0 WHERE [EventID]=" & eventId
-    Exec "INSERT INTO tblImport (EventID, PriceFile, TipsFile, ImportedAt, IsCurrent) VALUES (" & _
-        eventId & "," & SqlText(Left$(pricePath, 255)) & "," & SqlText(Left$(tipsPath, 255)) & "," & _
-        "#" & Format$(Now, "mm/dd/yyyy hh:nn:ss") & "#,-1)"
-    importId = CLng(Scalar("SELECT Max(ImportID) FROM tblImport WHERE EventID=" & eventId))
+    Set rs = db.OpenRecordset("SELECT * FROM [tblImport]", 2)
+    If Not RowHas(rs, "IsCurrent") Then
+        rs.Close
+        Err.Raise 3265, "EMS", "Access has not picked up tblImport.IsCurrent yet. Close the database, open it again, and run the import once more."
+    End If
+    Do While Not rs.EOF
+        If CLng(Nz(rs!EventID, 0)) = eventId Then
+            rs.Edit
+            rs!IsCurrent = False
+            rs.Update
+        End If
+        rs.MoveNext
+    Loop
+    rs.AddNew
+    rs!EventID = eventId
+    rs!PriceFile = Left$(pricePath, 255)
+    rs!TipsFile = Left$(tipsPath, 255)
+    rs!ImportedAt = Now
+    rs!IsCurrent = True
+    rs.Update
+    rs.Bookmark = rs.LastModified
+    importId = CLng(rs!ImportID)
+    rs.Close
     LoadPrice eventId, importId, priceRows
     LoadTips eventId, importId, tipRows
     Reconcile eventId, importId
