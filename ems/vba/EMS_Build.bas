@@ -610,12 +610,12 @@ Private Sub DropObject(ByVal kind As AcObjectType, ByVal objectName As String)
 End Sub
 
 Private Sub SetTextProperty(ByVal propertyName As String, ByVal value As String)
-    Dim prop As DAO.Property
+    Dim prop As Object
     On Error Resume Next
     CurrentDb.Properties(propertyName) = value
     If Err.Number <> 0 Then
         Err.Clear
-        Set prop = CurrentDb.CreateProperty(propertyName, dbText, value)
+        Set prop = CurrentDb.CreateProperty(propertyName, EMS_TEXT, value)
         CurrentDb.Properties.Append prop
     End If
 End Sub

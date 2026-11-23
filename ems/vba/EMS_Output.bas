@@ -11,12 +11,12 @@ Public Sub EMSPreviewCurrent()
 End Sub
 
 Public Sub EMSExportCurrent()
-    Dim rs As DAO.Recordset
+    Dim rs As Object
     Dim count As Long
     Dim folder As String
     If Nz(Forms!frmEvent!EventID, 0) = 0 Then Exit Sub
     If Forms!frmEvent.Dirty Then Forms!frmEvent.Dirty = False
-    Set rs = CurrentDb.OpenRecordset("SELECT InvoiceID FROM tblInvoice WHERE EventID=" & Forms!frmEvent!EventID, dbOpenSnapshot)
+    Set rs = CurrentDb.OpenRecordset("SELECT InvoiceID FROM tblInvoice WHERE EventID=" & Forms!frmEvent!EventID, EMS_SNAPSHOT)
     folder = EMSFolder()
     Do While Not rs.EOF
         EMSExportInvoice CLng(rs!InvoiceID), folder
@@ -32,11 +32,11 @@ Public Sub EMSExportCurrent()
 End Sub
 
 Public Sub EMSEmailCurrent()
-    Dim rs As DAO.Recordset
+    Dim rs As Object
     Dim count As Long
     If Nz(Forms!frmEvent!EventID, 0) = 0 Then Exit Sub
     If Forms!frmEvent.Dirty Then Forms!frmEvent.Dirty = False
-    Set rs = CurrentDb.OpenRecordset("SELECT InvoiceID FROM tblInvoice WHERE EventID=" & Forms!frmEvent!EventID, dbOpenSnapshot)
+    Set rs = CurrentDb.OpenRecordset("SELECT InvoiceID FROM tblInvoice WHERE EventID=" & Forms!frmEvent!EventID, EMS_SNAPSHOT)
     Do While Not rs.EOF
         EMSEmailInvoice CLng(rs!InvoiceID)
         count = count + 1
@@ -53,9 +53,9 @@ Public Sub EMSEmailInvoice(ByVal invoiceId As Long)
     Dim message As Object
     Dim primary As String
     Dim copies As String
-    Dim head As DAO.Recordset
+    Dim head As Object
     path = EMSExportInvoice(invoiceId, EMSFolder())
-    Set head = CurrentDb.OpenRecordset("SELECT * FROM tblPrintHead", dbOpenSnapshot)
+    Set head = CurrentDb.OpenRecordset("SELECT * FROM tblPrintHead", EMS_SNAPSHOT)
     PayeeMail CLng(Scalar("SELECT PayeeID FROM tblInvoice WHERE InvoiceID=" & invoiceId)), primary, copies
     On Error Resume Next
     Set outlook = GetObject(, "Outlook.Application")
@@ -100,10 +100,10 @@ Private Function SelectedInvoice() As Long
 End Function
 
 Private Sub PayeeMail(ByVal payeeId As Long, ByRef primary As String, ByRef copies As String)
-    Dim rs As DAO.Recordset
+    Dim rs As Object
     primary = ""
     copies = ""
-    Set rs = CurrentDb.OpenRecordset("SELECT EmailAddress, IsPrimary FROM tblPayeeEmail WHERE PayeeID=" & payeeId & " ORDER BY IsPrimary DESC, EmailID", dbOpenSnapshot)
+    Set rs = CurrentDb.OpenRecordset("SELECT EmailAddress, IsPrimary FROM tblPayeeEmail WHERE PayeeID=" & payeeId & " ORDER BY IsPrimary DESC, EmailID", EMS_SNAPSHOT)
     Do While Not rs.EOF
         If Len(primary) = 0 Then
             primary = CStr(Nz(rs!EmailAddress, ""))
@@ -117,11 +117,11 @@ Private Sub PayeeMail(ByVal payeeId As Long, ByRef primary As String, ByRef copi
 End Sub
 
 Public Sub EMSFillStatement(ByVal invoiceId As Long)
-    Dim invoice As DAO.Recordset
-    Dim eventRow As DAO.Recordset
-    Dim payee As DAO.Recordset
-    Dim lines As DAO.Recordset
-    Dim extras As DAO.Recordset
+    Dim invoice As Object
+    Dim eventRow As Object
+    Dim payee As Object
+    Dim lines As Object
+    Dim extras As Object
     Dim showAdj As Boolean
     Dim sortIndex As Long
     Dim company As String
@@ -129,10 +129,10 @@ Public Sub EMSFillStatement(ByVal invoiceId As Long)
     Dim cleaning As Currency
     Dim misc As Currency
     EMSClearPrint
-    Set invoice = CurrentDb.OpenRecordset("SELECT * FROM tblInvoice WHERE InvoiceID=" & invoiceId, dbOpenSnapshot)
-    Set eventRow = CurrentDb.OpenRecordset("SELECT * FROM tblEvent WHERE EventID=" & invoice!EventID, dbOpenSnapshot)
-    Set payee = CurrentDb.OpenRecordset("SELECT * FROM tblPayee WHERE PayeeID=" & invoice!PayeeID, dbOpenSnapshot)
-    Set lines = CurrentDb.OpenRecordset("SELECT * FROM tblInvoiceLine WHERE InvoiceID=" & invoiceId & " ORDER BY SortOrder, LineID", dbOpenSnapshot)
+    Set invoice = CurrentDb.OpenRecordset("SELECT * FROM tblInvoice WHERE InvoiceID=" & invoiceId, EMS_SNAPSHOT)
+    Set eventRow = CurrentDb.OpenRecordset("SELECT * FROM tblEvent WHERE EventID=" & invoice!EventID, EMS_SNAPSHOT)
+    Set payee = CurrentDb.OpenRecordset("SELECT * FROM tblPayee WHERE PayeeID=" & invoice!PayeeID, EMS_SNAPSHOT)
+    Set lines = CurrentDb.OpenRecordset("SELECT * FROM tblInvoiceLine WHERE InvoiceID=" & invoiceId & " ORDER BY SortOrder, LineID", EMS_SNAPSHOT)
     showAdj = False
     sortIndex = 1
     Do While Not lines.EOF
@@ -144,7 +144,7 @@ Public Sub EMSFillStatement(ByVal invoiceId As Long)
     InsertTotal sortIndex, invoice
     company = Nz(Scalar("SELECT TOP 1 CompanyCode FROM tblOffice"), "241")
     center = Nz(Scalar("SELECT TOP 1 CostCenter FROM tblOffice"), "36127")
-    Set extras = CurrentDb.OpenRecordset("SELECT Label, Amount, GLCode FROM tblSupplement WHERE EventID=" & invoice!EventID & " AND PayeeID=" & invoice!PayeeID & " ORDER BY SupplementID", dbOpenSnapshot)
+    Set extras = CurrentDb.OpenRecordset("SELECT Label, Amount, GLCode FROM tblSupplement WHERE EventID=" & invoice!EventID & " AND PayeeID=" & invoice!PayeeID & " ORDER BY SupplementID", EMS_SNAPSHOT)
     sortIndex = 1
     Do While Not extras.EOF
         InsertExtra sortIndex, CStr(extras!Label), CCur(Nz(extras!Amount, 0)), ""
@@ -184,7 +184,7 @@ Private Sub EMSClearPrint()
     Exec "DELETE FROM tblPrintHead"
 End Sub
 
-Private Sub InsertPrintLine(ByVal sortIndex As Long, ByVal locationName As String, ByVal lines As DAO.Recordset)
+Private Sub InsertPrintLine(ByVal sortIndex As Long, ByVal locationName As String, ByVal lines As Object)
     Exec "INSERT INTO tblPrintLine (SortOrder, ServiceArea, NetSales, FoodNet, FoodCommission, AlcoholNet, AlcoholCommission, Commission, Gratuity, Adjustments, Payout) VALUES (" & _
         sortIndex & "," & SqlText(Left$(locationName, 150)) & "," & SqlText(MoneyText(CCur(lines!NetSales))) & "," & SqlText(MoneyText(CCur(lines!FoodNet))) & "," & _
         SqlText(MoneyText(CCur(lines!FoodCommission))) & "," & SqlText(MoneyText(CCur(lines!AlcoholNet))) & "," & SqlText(MoneyText(CCur(lines!AlcoholCommission))) & "," & _
@@ -192,7 +192,7 @@ Private Sub InsertPrintLine(ByVal sortIndex As Long, ByVal locationName As Strin
         SqlText(MoneyText(CCur(lines!Payout))) & ")"
 End Sub
 
-Private Sub InsertTotal(ByVal sortIndex As Long, ByVal invoice As DAO.Recordset)
+Private Sub InsertTotal(ByVal sortIndex As Long, ByVal invoice As Object)
     Exec "INSERT INTO tblPrintLine (SortOrder, ServiceArea, NetSales, FoodNet, FoodCommission, AlcoholNet, AlcoholCommission, Commission, Gratuity, Adjustments, Payout) VALUES (" & _
         sortIndex & ",'LOCATION TOTAL'," & SqlText(MoneyText(CCur(invoice!GroupNet))) & "," & SqlText(MoneyText(CCur(invoice!FoodNet))) & "," & _
         SqlText(MoneyText(CCur(invoice!FoodCommission))) & "," & SqlText(MoneyText(CCur(invoice!AlcoholNet))) & "," & SqlText(MoneyText(CCur(invoice!AlcoholCommission))) & "," & _
@@ -210,7 +210,7 @@ Private Sub InsertGl(ByVal company As String, ByVal center As String, ByVal sort
     Exec "INSERT INTO tblPrintExtra (SortOrder, Label, Amount, GLText) VALUES (" & sortIndex & "," & SqlText(label) & "," & SqlText(MoneyText(amount, True)) & "," & SqlText(glText) & ")"
 End Sub
 
-Private Sub InsertHead(ByVal invoice As DAO.Recordset, ByVal eventRow As DAO.Recordset, ByVal payee As DAO.Recordset, ByVal showAdj As Boolean)
+Private Sub InsertHead(ByVal invoice As Object, ByVal eventRow As Object, ByVal payee As Object, ByVal showAdj As Boolean)
     Dim address As String
     address = Trim$(CStr(Nz(payee!Address1, "")) & " " & CStr(Nz(payee!Address2, "")))
     Exec "INSERT INTO tblPrintHead (Kind, PayeeName, AddressBlock, StatementDate, InvoiceNumber, AmountDue, EventWhen, EventType, Abbreviation, SAPID, BSSID, StatusText, FoodNet, AlcoholNet, GroupNet, GrossSales, Notes, PreparedBy, PreparedTitle, PreparedWhen, ReviewedBy, ReviewedTitle, ReviewedWhen, ApprovedBy, ApprovedTitle, ApprovedWhen, EventWhenShort, FoodRateLabel, AlcoholRateLabel, ShowAdjustments, Extra) VALUES (" & _
@@ -231,7 +231,7 @@ Private Function DateText(ByVal value As Variant) As String
     If IsNull(value) Then DateText = "" Else DateText = Format$(CDate(value), "mm/dd/yyyy")
 End Function
 
-Private Function FoodRateLabel(ByVal invoice As DAO.Recordset, ByVal eventRow As DAO.Recordset) As String
+Private Function FoodRateLabel(ByVal invoice As Object, ByVal eventRow As Object) As String
     Dim rate As Double
     If CStr(invoice!Kind) = "NPO" Then
         rate = RateOn(CLng(invoice!PayeeID), "DONATION_FOOD", CDate(eventRow!EventDate), 0.1)
@@ -241,7 +241,7 @@ Private Function FoodRateLabel(ByVal invoice As DAO.Recordset, ByVal eventRow As
     FoodRateLabel = Format$(rate, "0%") & " COMM."
 End Function
 
-Private Function AlcoholRateLabel(ByVal invoice As DAO.Recordset, ByVal eventRow As DAO.Recordset) As String
+Private Function AlcoholRateLabel(ByVal invoice As Object, ByVal eventRow As Object) As String
     Dim beerRate As Double
     Dim liquorRate As Double
     Dim naRate As Double
@@ -273,12 +273,12 @@ End Function
 
 Public Function EMSStatementOpen()
     On Error GoTo Failed
-    Dim head As DAO.Recordset
+    Dim head As Object
     Dim report As Report
     Dim index As Long
-    Dim extras As DAO.Recordset
+    Dim extras As Object
     Set report = Reports("rptStatement")
-    Set head = CurrentDb.OpenRecordset("SELECT * FROM tblPrintHead", dbOpenSnapshot)
+    Set head = CurrentDb.OpenRecordset("SELECT * FROM tblPrintHead", EMS_SNAPSHOT)
     If head.EOF Then Exit Function
     report!txtStatus = CStr(Nz(head!StatusText, ""))
     report!txtPayee = CStr(Nz(head!PayeeName, ""))
@@ -330,7 +330,7 @@ Public Function EMSStatementOpen()
         report("txtGlCode" & index) = ""
         report("txtGlAmt" & index) = ""
     Next index
-    Set extras = CurrentDb.OpenRecordset("SELECT * FROM tblPrintExtra WHERE SortOrder<100 ORDER BY SortOrder", dbOpenSnapshot)
+    Set extras = CurrentDb.OpenRecordset("SELECT * FROM tblPrintExtra WHERE SortOrder<100 ORDER BY SortOrder", EMS_SNAPSHOT)
     index = 1
     Do While Not extras.EOF And index <= 8
         report("txtSup" & index) = CStr(Nz(extras!Label, ""))
@@ -339,7 +339,7 @@ Public Function EMSStatementOpen()
         extras.MoveNext
     Loop
     extras.Close
-    Set extras = CurrentDb.OpenRecordset("SELECT * FROM tblPrintExtra WHERE SortOrder>=100 ORDER BY SortOrder", dbOpenSnapshot)
+    Set extras = CurrentDb.OpenRecordset("SELECT * FROM tblPrintExtra WHERE SortOrder>=100 ORDER BY SortOrder", EMS_SNAPSHOT)
     index = 1
     Do While Not extras.EOF And index <= 8
         report("txtGl" & index) = CStr(Nz(extras!Label, ""))

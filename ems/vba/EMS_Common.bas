@@ -2,6 +2,12 @@ Attribute VB_Name = "EMS_Common"
 Option Compare Database
 Option Explicit
 
+' Numeric stand-ins for the database-engine constants. The Jackcess file has
+' no DAO reference, so the project compiles without that library checked.
+Public Const EMS_SNAPSHOT As Long = 4
+Public Const EMS_FAIL As Long = 128
+Public Const EMS_TEXT As Long = 10
+
 ' Shared helpers. Money that is split (gratuity and staff) is cut off at the
 ' cent and the leftover stays with Levy. Commission lines round half up.
 
@@ -13,15 +19,15 @@ End Function
 
 Public Sub Exec(ByVal sql As String)
     On Error GoTo Failed
-    CurrentDb.Execute sql, dbFailOnError
+    CurrentDb.Execute sql, EMS_FAIL
     Exit Sub
 Failed:
     Err.Raise Err.Number, "EMS", Err.Description & vbCrLf & Left$(sql, 240)
 End Sub
 
 Public Function Scalar(ByVal sql As String) As Variant
-    Dim rs As DAO.Recordset
-    Set rs = CurrentDb.OpenRecordset(sql, dbOpenSnapshot)
+    Dim rs As Object
+    Set rs = CurrentDb.OpenRecordset(sql, EMS_SNAPSHOT)
     If rs.EOF Then Scalar = Null Else Scalar = rs.Fields(0).Value
     rs.Close
 End Function
@@ -84,13 +90,13 @@ Public Function MoneyText(ByVal amount As Currency, Optional ByVal blankZero As 
 End Function
 
 Public Function RateOn(ByVal payeeId As Long, ByVal code As String, ByVal eventDay As Date, ByVal fallback As Double) As Double
-    Dim rs As DAO.Recordset
+    Dim rs As Object
     Set rs = CurrentDb.OpenRecordset( _
         "SELECT TOP 1 RateAmount FROM tblPayeeRate WHERE PayeeID=" & payeeId & _
         " AND RateCode=" & SqlText(code) & _
         " AND EffectiveDate<=#" & Format$(eventDay, "mm/dd/yyyy") & "#" & _
         " AND (EndDate Is Null OR EndDate>=#" & Format$(eventDay, "mm/dd/yyyy") & "#)" & _
-        " ORDER BY EffectiveDate DESC", dbOpenSnapshot)
+        " ORDER BY EffectiveDate DESC", EMS_SNAPSHOT)
     If rs.EOF Then RateOn = fallback Else RateOn = CDbl(Nz(rs!RateAmount, fallback))
     rs.Close
 End Function
@@ -161,8 +167,10 @@ End Function
 
 Public Function PickFile(ByVal title As String) As String
     On Error GoTo Typed
+    Dim host As Object
     Dim dialog As Object
-    Set dialog = Application.FileDialog(3)
+    Set host = Application
+    Set dialog = host.FileDialog(3)
     dialog.title = title
     dialog.AllowMultiSelect = False
     dialog.Filters.Clear
@@ -181,14 +189,14 @@ Public Function InvoiceNumber(ByVal eventDay As Date, ByVal abbreviation As Stri
 End Function
 
 Public Sub FieldCaption(ByVal tableName As String, ByVal fieldName As String, ByVal caption As String)
-    Dim fld As DAO.Field
-    Dim prop As DAO.Property
+    Dim fld As Object
+    Dim prop As Object
     Set fld = CurrentDb.TableDefs(tableName).Fields(fieldName)
     On Error Resume Next
     fld.Properties("Caption") = caption
     If Err.Number <> 0 Then
         Err.Clear
-        Set prop = CurrentDb.CreateProperty("Caption", dbText, caption)
+        Set prop = CurrentDb.CreateProperty("Caption", EMS_TEXT, caption)
         fld.Properties.Append prop
     End If
     On Error GoTo 0

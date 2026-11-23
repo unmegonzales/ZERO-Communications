@@ -17,7 +17,7 @@ Public Sub EMSCalculateEvent(ByVal eventId As Long)
     On Error GoTo Failed
     Dim eventDay As Date
     Dim minimum As Currency
-    Dim rs As DAO.Recordset
+    Dim rs As Object
     Dim groups As Object
     Dim key As Variant
     If eventId = 0 Then
@@ -30,14 +30,13 @@ Public Sub EMSCalculateEvent(ByVal eventId As Long)
     End If
     eventDay = CDate(Scalar("SELECT EventDate FROM tblEvent WHERE EventID=" & eventId))
     minimum = CCur(Nz(Scalar("SELECT MinimumCommission FROM tblEvent WHERE EventID=" & eventId), 200))
-    DBEngine.BeginTrans
     Exec "DELETE FROM tblInvoiceLine WHERE InvoiceID In (SELECT InvoiceID FROM tblInvoice WHERE EventID=" & eventId & ")"
     Exec "DELETE FROM tblInvoice WHERE EventID=" & eventId
     Exec "DELETE FROM tblStaffTip WHERE EventID=" & eventId
     Exec "DELETE FROM tblException WHERE EventID=" & eventId & " AND Kind In ('Headcount','Unassigned','No payee','Staff names','Alcohol rate')"
     Exec "DELETE FROM tblSupplement WHERE EventID=" & eventId & " AND Label In ('CREDIT CARD FEES','ICE','SHORTAGE','OTHER EXPENSE')"
     Set groups = CreateObject("Scripting.Dictionary")
-    Set rs = CurrentDb.OpenRecordset("SELECT * FROM tblAssign WHERE EventID=" & eventId & " ORDER BY LocationName", dbOpenSnapshot)
+    Set rs = CurrentDb.OpenRecordset("SELECT * FROM tblAssign WHERE EventID=" & eventId & " ORDER BY LocationName", EMS_SNAPSHOT)
     Do While Not rs.EOF
         Accumulate rs, eventId, eventDay, minimum, groups
         rs.MoveNext
@@ -46,16 +45,13 @@ Public Sub EMSCalculateEvent(ByVal eventId As Long)
     For Each key In groups.Keys
         WriteInvoice eventId, eventDay, CLng(key), groups(key)
     Next key
-    DBEngine.CommitTrans
     MsgBox "Calculation finished. Open stands and blank staff counts are listed under exceptions and were left unpaid. Everything else was calculated.", vbInformation
     Exit Sub
 Failed:
-    On Error Resume Next
-    DBEngine.Rollback
-    MsgBox "Calculate stopped." & vbCrLf & Err.Description, vbCritical
+    MsgBox "Calculate stopped. Run Calculate again and it will rebuild this event." & vbCrLf & Err.Description, vbCritical
 End Sub
 
-Private Sub Accumulate(ByVal rs As DAO.Recordset, ByVal eventId As Long, ByVal eventDay As Date, ByVal minimum As Currency, ByVal groups As Object)
+Private Sub Accumulate(ByVal rs As Object, ByVal eventId As Long, ByVal eventDay As Date, ByVal minimum As Currency, ByVal groups As Object)
     Dim role As String
     Dim tips As Currency
     Dim sales As Currency
@@ -79,7 +75,7 @@ Private Sub Accumulate(ByVal rs As DAO.Recordset, ByVal eventId As Long, ByVal e
     AddLine rs, eventId, eventDay, minimum, role, CLng(rs!PayeeID), groups
 End Sub
 
-Private Sub SplitStaff(ByVal rs As DAO.Recordset, ByVal eventId As Long, ByVal tips As Currency)
+Private Sub SplitStaff(ByVal rs As Object, ByVal eventId As Long, ByVal tips As Currency)
     Dim people As Long
     Dim names As Collection
     Dim cents As Variant
@@ -132,7 +128,7 @@ Private Function StaffList(ByVal raw As String, ByVal people As Long, ByVal even
     Set StaffList = result
 End Function
 
-Private Sub AddLine(ByVal rs As DAO.Recordset, ByVal eventId As Long, ByVal eventDay As Date, ByVal minimum As Currency, ByVal role As String, ByVal payeeId As Long, ByVal groups As Object)
+Private Sub AddLine(ByVal rs As Object, ByVal eventId As Long, ByVal eventDay As Date, ByVal minimum As Currency, ByVal role As String, ByVal payeeId As Long, ByVal groups As Object)
     Dim food As Currency, na As Currency, beer As Currency, liquor As Currency
     Dim fromFile As Boolean
     Dim foodRate As Double, alcoholRate As Double
@@ -201,13 +197,13 @@ Private Function SubAlcoholCommission(ByVal payeeId As Long, ByVal eventDay As D
     End If
 End Function
 
-Private Sub StandNets(ByVal rs As DAO.Recordset, ByRef food As Currency, ByRef na As Currency, ByRef beer As Currency, ByRef liquor As Currency, ByRef fromFile As Boolean)
-    Dim sales As DAO.Recordset
+Private Sub StandNets(ByVal rs As Object, ByRef food As Currency, ByRef na As Currency, ByRef beer As Currency, ByRef liquor As Currency, ByRef fromFile As Boolean)
+    Dim sales As Object
     food = 0
     na = 0
     beer = 0
     liquor = 0
-    Set sales = CurrentDb.OpenRecordset("SELECT Bucket, Sum(NetSales) AS NetAmount FROM tblSale WHERE EventID=" & rs!EventID & " AND LocationName=" & SqlText(CStr(rs!LocationName)) & " GROUP BY Bucket", dbOpenSnapshot)
+    Set sales = CurrentDb.OpenRecordset("SELECT Bucket, Sum(NetSales) AS NetAmount FROM tblSale WHERE EventID=" & rs!EventID & " AND LocationName=" & SqlText(CStr(rs!LocationName)) & " GROUP BY Bucket", EMS_SNAPSHOT)
     fromFile = Not sales.EOF
     Do While Not sales.EOF
         Select Case UCase$(CStr(Nz(sales!Bucket, "")))
@@ -242,7 +238,7 @@ Private Sub WriteInvoice(ByVal eventId As Long, ByVal eventDay As Date, ByVal pa
     Dim due As Currency
     Dim invoiceId As Long
     Dim sortIndex As Long
-    Dim payee As DAO.Recordset
+    Dim payee As Object
     kind = "NPO"
     For Each line In lines
         kind = CStr(line("Kind"))
@@ -258,7 +254,7 @@ Private Sub WriteInvoice(ByVal eventId As Long, ByVal eventDay As Date, ByVal pa
     If kind = "SUB" Then VendorCosts eventId, payeeId, eventDay, foodNet + alcoholNet, gross, cardFee, ice, shortage, other
     supplements = CCur(Nz(Scalar("SELECT Sum(Amount) FROM tblSupplement WHERE EventID=" & eventId & " AND PayeeID=" & payeeId), 0))
     due = commission + gratuity + adjustments + supplements - cardFee - ice - shortage - other
-    Set payee = CurrentDb.OpenRecordset("SELECT Abbreviation FROM tblPayee WHERE PayeeID=" & payeeId, dbOpenSnapshot)
+    Set payee = CurrentDb.OpenRecordset("SELECT Abbreviation FROM tblPayee WHERE PayeeID=" & payeeId, EMS_SNAPSHOT)
     Exec "INSERT INTO tblInvoice (EventID, PayeeID, InvoiceNumber, Kind, GrossSales, FoodNet, AlcoholNet, GroupNet, FoodCommission, AlcoholCommission, Commission, Gratuity, LocationAdjustments, Supplements, AmountDue, CardFee, IceAmount, Shortage, OtherExpense, Notes) VALUES (" & _
         eventId & "," & payeeId & "," & SqlText(InvoiceNumber(eventDay, Nz(payee!Abbreviation, ""), payeeId)) & "," & SqlText(kind) & "," & _
         gross & "," & foodNet & "," & alcoholNet & "," & (foodNet + alcoholNet) & "," & foodComm & "," & alcoholComm & "," & commission & "," & _
@@ -280,13 +276,13 @@ Private Sub WriteInvoice(ByVal eventId As Long, ByVal eventDay As Date, ByVal pa
 End Sub
 
 Private Sub VendorCosts(ByVal eventId As Long, ByVal payeeId As Long, ByVal eventDay As Date, ByVal net As Currency, ByVal gross As Currency, ByRef cardFee As Currency, ByRef ice As Currency, ByRef shortage As Currency, ByRef other As Currency)
-    Dim rs As DAO.Recordset
+    Dim rs As Object
     Dim tenders As Currency
     cardFee = 0
     ice = 0
     shortage = 0
     other = 0
-    Set rs = CurrentDb.OpenRecordset("SELECT Nz(Sum(CashTender),0) AS CashTender, Nz(Sum(CardTender),0) AS CardTender, Nz(Sum(CorporateVoucher),0) AS CorporateVoucher, Nz(Sum(LevyNfpVoucher),0) AS LevyNfpVoucher, Nz(Sum(UnmGuestVoucher),0) AS UnmGuestVoucher, Nz(Sum(IceBags),0) AS IceBags, Nz(Sum(OtherExpense),0) AS OtherExpense FROM tblVendorInput WHERE EventID=" & eventId & " AND PayeeID=" & payeeId, dbOpenSnapshot)
+    Set rs = CurrentDb.OpenRecordset("SELECT Nz(Sum(CashTender),0) AS CashTender, Nz(Sum(CardTender),0) AS CardTender, Nz(Sum(CorporateVoucher),0) AS CorporateVoucher, Nz(Sum(LevyNfpVoucher),0) AS LevyNfpVoucher, Nz(Sum(UnmGuestVoucher),0) AS UnmGuestVoucher, Nz(Sum(IceBags),0) AS IceBags, Nz(Sum(OtherExpense),0) AS OtherExpense FROM tblVendorInput WHERE EventID=" & eventId & " AND PayeeID=" & payeeId, EMS_SNAPSHOT)
     If rs.EOF Then
         rs.Close
         cardFee = MoneyProduct(net, RateOn(payeeId, "CARD_FEE", eventDay, 0.03))
@@ -332,7 +328,7 @@ Public Function EMSEventOpen()
 End Function
 
 Private Sub ApplyEventDefaults()
-    Dim office As DAO.Recordset
+    Dim office As Object
     With Forms!frmEvent
         If IsNull(!EventDate) Then !EventDate = Date
         If Len(Nz(!EventType, "")) = 0 Then !EventType = "Event"
@@ -341,7 +337,7 @@ Private Sub ApplyEventDefaults()
         If Nz(!MinimumCommission, 0) = 0 Then !MinimumCommission = 200
         If Len(Nz(!StatusText, "")) = 0 Then !StatusText = "DRAFT"
     End With
-    Set office = CurrentDb.OpenRecordset("SELECT TOP 1 * FROM tblOffice", dbOpenSnapshot)
+    Set office = CurrentDb.OpenRecordset("SELECT TOP 1 * FROM tblOffice", EMS_SNAPSHOT)
     If Not office.EOF Then
         With Forms!frmEvent
             If Len(Nz(!PreparedBy, "")) = 0 Then !PreparedBy = office!PreparedBy

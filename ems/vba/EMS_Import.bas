@@ -54,10 +54,8 @@ Public Sub EMSImportPair(ByVal eventId As Long)
 
     Dim created As Boolean
     Dim importId As Long
-    DBEngine.BeginTrans
     eventId = ResolveEvent(eventId, priceName, priceDay, created)
     importId = ReplaceReports(eventId, pricePath, tipsPath, priceRows, tipRows)
-    DBEngine.CommitTrans
 
     Dim count As Variant
     count = Scalar("SELECT Count(*) FROM tblException WHERE EventID=" & eventId)
@@ -67,19 +65,17 @@ Public Sub EMSImportPair(ByVal eventId As Long)
     If created Then DoCmd.OpenForm "frmEvent", , , "EventID=" & eventId
     Exit Sub
 Failed:
-    On Error Resume Next
-    DBEngine.Rollback
-    MsgBox "Import stopped." & vbCrLf & Err.Description, vbCritical
+    MsgBox "Import stopped. Run the import again if this event was only partly loaded." & vbCrLf & Err.Description, vbCritical
 End Sub
 
 Private Function ResolveEvent(ByVal eventId As Long, ByVal eventName As String, ByVal eventDay As Date, ByRef created As Boolean) As Long
-    Dim rs As DAO.Recordset
+    Dim rs As Object
     created = False
     If eventId > 0 Then
         ResolveEvent = eventId
         Exit Function
     End If
-    Set rs = CurrentDb.OpenRecordset("SELECT EventID, EventName FROM tblEvent WHERE EventDate=#" & Format$(eventDay, "mm/dd/yyyy") & "#", dbOpenSnapshot)
+    Set rs = CurrentDb.OpenRecordset("SELECT EventID, EventName FROM tblEvent WHERE EventDate=#" & Format$(eventDay, "mm/dd/yyyy") & "#", EMS_SNAPSHOT)
     Do While Not rs.EOF
         If EventKey(CStr(rs!EventName)) = EventKey(eventName) Then
             ResolveEvent = CLng(rs!EventID)
@@ -94,8 +90,8 @@ Private Function ResolveEvent(ByVal eventId As Long, ByVal eventName As String, 
 End Function
 
 Private Function InsertEvent(ByVal eventName As String, ByVal eventDay As Date) As Long
-    Dim office As DAO.Recordset
-    Set office = CurrentDb.OpenRecordset("SELECT TOP 1 * FROM tblOffice", dbOpenSnapshot)
+    Dim office As Object
+    Set office = CurrentDb.OpenRecordset("SELECT TOP 1 * FROM tblOffice", EMS_SNAPSHOT)
     Exec "INSERT INTO tblEvent (EventDate, EventName, EventType, Venue, TaxRate, MinimumCommission, StatusText, " & _
         "PreparedBy, PreparedTitle, ReviewedBy, ReviewedTitle, ApprovedBy, ApprovedTitle, Notes, CreatedAt) VALUES (" & _
         "#" & Format$(eventDay, "mm/dd/yyyy") & "#," & SqlText(Left$(eventName, 200)) & "," & SqlText(GuessType(eventName)) & "," & _
@@ -208,10 +204,10 @@ Private Sub LoadTips(ByVal eventId As Long, ByVal importId As Long, ByVal rows A
 End Sub
 
 Private Sub Reconcile(ByVal eventId As Long, ByVal importId As Long)
-    Dim rs As DAO.Recordset
+    Dim rs As Object
     Set rs = CurrentDb.OpenRecordset( _
         "SELECT t.LocationName, t.SalesAmount, Nz((SELECT Sum(s.GrossSales) FROM tblSale AS s WHERE s.ImportID=t.ImportID AND s.LocationName=t.LocationName),0) AS PriceGross " & _
-        "FROM tblTip AS t WHERE t.ImportID=" & importId, dbOpenSnapshot)
+        "FROM tblTip AS t WHERE t.ImportID=" & importId, EMS_SNAPSHOT)
     Do While Not rs.EOF
         If Abs(CCur(Nz(rs!SalesAmount, 0)) - CCur(Nz(rs!PriceGross, 0))) > 0.01 Then
             LogException eventId, importId, "Sales mismatch", CStr(rs!LocationName) & " tips report " & MoneyText(CCur(rs!SalesAmount)) & ", price report " & MoneyText(CCur(rs!PriceGross)) & ". Both amounts were kept."
@@ -222,7 +218,7 @@ Private Sub Reconcile(ByVal eventId As Long, ByVal importId As Long)
 End Sub
 
 Private Sub SyncAssignments(ByVal eventId As Long, ByVal importId As Long)
-    Dim rs As DAO.Recordset
+    Dim rs As Object
     Dim locationName As String
     Dim gross As Currency
     Dim tips As Currency
@@ -233,7 +229,7 @@ Private Sub SyncAssignments(ByVal eventId As Long, ByVal importId As Long)
     Dim existing As Variant
     Set rs = CurrentDb.OpenRecordset( _
         "SELECT LocationName FROM tblSale WHERE ImportID=" & importId & _
-        " UNION SELECT LocationName FROM tblTip WHERE ImportID=" & importId, dbOpenSnapshot)
+        " UNION SELECT LocationName FROM tblTip WHERE ImportID=" & importId, EMS_SNAPSHOT)
     Do While Not rs.EOF
         locationName = CStr(rs!LocationName)
         gross = CCur(Nz(Scalar("SELECT Sum(GrossSales) FROM tblSale WHERE ImportID=" & importId & " AND LocationName=" & SqlText(locationName)), 0))
@@ -252,7 +248,7 @@ Private Sub SyncAssignments(ByVal eventId As Long, ByVal importId As Long)
         rs.MoveNext
     Loop
     rs.Close
-    Set rs = CurrentDb.OpenRecordset("SELECT AssignID, LocationName FROM tblAssign WHERE EventID=" & eventId, dbOpenSnapshot)
+    Set rs = CurrentDb.OpenRecordset("SELECT AssignID, LocationName FROM tblAssign WHERE EventID=" & eventId, EMS_SNAPSHOT)
     Do While Not rs.EOF
         If IsNull(Scalar("SELECT Top 1 SaleID FROM tblSale WHERE ImportID=" & importId & " AND LocationName=" & SqlText(CStr(rs!LocationName)))) And _
            IsNull(Scalar("SELECT Top 1 TipID FROM tblTip WHERE ImportID=" & importId & " AND LocationName=" & SqlText(CStr(rs!LocationName)))) Then
@@ -274,11 +270,11 @@ Private Sub EnsureLocation(ByVal eventId As Long, ByVal importId As Long, ByVal 
 End Sub
 
 Private Sub ReadNets(ByVal importId As Long, ByVal locationName As String, ByRef foodNet As Currency, ByRef naNet As Currency, ByRef alcoholNet As Currency)
-    Dim rs As DAO.Recordset
+    Dim rs As Object
     foodNet = 0
     naNet = 0
     alcoholNet = 0
-    Set rs = CurrentDb.OpenRecordset("SELECT Bucket, Sum(NetSales) AS NetAmount FROM tblSale WHERE ImportID=" & importId & " AND LocationName=" & SqlText(locationName) & " GROUP BY Bucket", dbOpenSnapshot)
+    Set rs = CurrentDb.OpenRecordset("SELECT Bucket, Sum(NetSales) AS NetAmount FROM tblSale WHERE ImportID=" & importId & " AND LocationName=" & SqlText(locationName) & " GROUP BY Bucket", EMS_SNAPSHOT)
     Do While Not rs.EOF
         Select Case UCase$(CStr(Nz(rs!Bucket, "")))
             Case "FOOD", "OTHER"
@@ -294,7 +290,7 @@ Private Sub ReadNets(ByVal importId As Long, ByVal locationName As String, ByRef
 End Sub
 
 Private Sub InsertAssignment(ByVal eventId As Long, ByVal importId As Long, ByVal locationName As String, ByVal departmentName As String, ByVal gross As Currency, ByVal tips As Currency, ByVal foodNet As Currency, ByVal naNet As Currency, ByVal alcoholNet As Currency)
-    Dim prior As DAO.Recordset
+    Dim prior As Object
     Dim role As String
     Dim payeeSql As String
     Dim headcount As Long
@@ -306,7 +302,7 @@ Private Sub InsertAssignment(ByVal eventId As Long, ByVal importId As Long, ByVa
     names = ""
     Set prior = CurrentDb.OpenRecordset( _
         "SELECT TOP 1 Role, PayeeID, Headcount, StaffNames FROM tblAssign WHERE LocationName=" & SqlText(locationName) & _
-        " AND EventID<>" & eventId & " AND Role<>'OPEN' ORDER BY EventID DESC", dbOpenSnapshot)
+        " AND EventID<>" & eventId & " AND Role<>'OPEN' ORDER BY EventID DESC", EMS_SNAPSHOT)
     If Not prior.EOF Then
         role = CStr(Nz(prior!role, "OPEN"))
         If Not IsNull(prior!PayeeID) Then payeeSql = CStr(prior!PayeeID)
