@@ -3,11 +3,15 @@ Option Compare Database
 Option Explicit
 
 Public Function EMSPreviewCurrent()
+    On Error GoTo Failed
     Dim invoiceId As Long
     invoiceId = SelectedInvoice()
     If invoiceId = 0 Then Exit Function
     EMSFillStatement invoiceId
     DoCmd.OpenReport "rptStatement", acViewPreview
+    Exit Function
+Failed:
+    MsgBox "Preview stopped." & vbCrLf & Err.Description, vbCritical
 End Function
 
 Public Function EMSExportCurrent()
@@ -220,6 +224,8 @@ Private Sub InsertHead(ByVal invoice As Object, ByVal eventRow As Object, ByVal 
     Dim apprName As String
     Dim apprTitle As String
     Dim whenText As String
+    Dim db As Object
+    Dim rs As Object
     address = Trim$(CStr(Nz(payee!Address1, "")) & " " & CStr(Nz(payee!Address2, "")))
     prepName = ""
     prepTitle = ""
@@ -238,18 +244,125 @@ Private Sub InsertHead(ByVal invoice As Object, ByVal eventRow As Object, ByVal 
     End If
     office.Close
     whenText = Format$(eventRow!EventDate, "mm/dd/yyyy")
-    Exec "INSERT INTO tblPrintHead (Kind, PayeeName, AddressBlock, StatementDate, InvoiceNumber, AmountDue, EventWhen, EventType, Abbreviation, SAPID, BSSID, StatusText, FoodNet, AlcoholNet, GroupNet, GrossSales, Notes, PreparedBy, PreparedTitle, PreparedWhen, ReviewedBy, ReviewedTitle, ReviewedWhen, ApprovedBy, ApprovedTitle, ApprovedWhen, EventWhenShort, FoodRateLabel, AlcoholRateLabel, ShowAdjustments, Extra) VALUES (" & _
-        SqlText(CStr(invoice!Kind)) & "," & SqlText(CStr(payee!PayeeName)) & "," & SqlText(Left$(address, 255)) & "," & _
-        SqlText(whenText) & "," & SqlText(CStr(invoice!InvoiceNumber)) & "," & SqlText(MoneyText(CCur(invoice!AmountDue))) & "," & _
-        SqlText(Format$(eventRow!EventDate, "mmm d, yyyy")) & "," & SqlText(CStr(Nz(eventRow!EventType, ""))) & "," & SqlText(CStr(Nz(payee!Abbreviation, ""))) & "," & _
-        SqlText(CStr(Nz(payee!SAPID, ""))) & "," & SqlText(CStr(Nz(payee!BSSID, ""))) & ",''," & _
-        SqlText(MoneyText(CCur(invoice!FoodNet))) & "," & SqlText(MoneyText(CCur(invoice!AlcoholNet))) & "," & SqlText(MoneyText(CCur(invoice!GroupNet))) & "," & SqlText(MoneyText(CCur(invoice!GrossSales))) & "," & _
-        SqlText(CStr(Nz(eventRow!Notes, ""))) & "," & _
-        SqlText(prepName) & "," & SqlText(prepTitle) & "," & SqlText(whenText) & "," & _
-        SqlText(revName) & "," & SqlText(revTitle) & "," & SqlText(whenText) & "," & _
-        SqlText(apprName) & "," & SqlText(apprTitle) & "," & SqlText(whenText) & "," & _
-        SqlText(whenText) & "," & SqlText(FoodRateLabel(invoice, eventRow)) & "," & SqlText(AlcoholRateLabel(invoice, eventRow)) & "," & _
-        IIf(showAdj, "-1", "0") & ",'')"
+    Set db = CurrentDb
+    EnsurePrintHead db
+    Set rs = db.OpenRecordset("SELECT * FROM tblPrintHead", 2)
+    rs.AddNew
+    PutField rs, "Kind", CStr(invoice!Kind)
+    PutField rs, "PayeeName", CStr(payee!PayeeName)
+    PutField rs, "AddressBlock", Left$(address, 255)
+    PutField rs, "StatementDate", whenText
+    PutField rs, "InvoiceNumber", CStr(invoice!InvoiceNumber)
+    PutField rs, "AmountDue", MoneyText(CCur(invoice!AmountDue))
+    PutField rs, "EventWhen", Format$(eventRow!EventDate, "mmm d, yyyy")
+    PutField rs, "EventType", CStr(Nz(eventRow!EventType, ""))
+    PutField rs, "Abbreviation", CStr(Nz(payee!Abbreviation, ""))
+    PutField rs, "SAPID", CStr(Nz(payee!SAPID, ""))
+    PutField rs, "BSSID", CStr(Nz(payee!BSSID, ""))
+    PutField rs, "StatusText", ""
+    PutField rs, "FoodNet", MoneyText(CCur(invoice!FoodNet))
+    PutField rs, "AlcoholNet", MoneyText(CCur(invoice!AlcoholNet))
+    PutField rs, "GroupNet", MoneyText(CCur(invoice!GroupNet))
+    PutField rs, "GrossSales", MoneyText(CCur(invoice!GrossSales))
+    PutField rs, "Notes", CStr(Nz(eventRow!Notes, ""))
+    PutField rs, "PreparedBy", prepName
+    PutField rs, "PreparedTitle", prepTitle
+    PutField rs, "PreparedWhen", whenText
+    PutField rs, "ReviewedBy", revName
+    PutField rs, "ReviewedTitle", revTitle
+    PutField rs, "ReviewedWhen", whenText
+    PutField rs, "ApprovedBy", apprName
+    PutField rs, "ApprovedTitle", apprTitle
+    PutField rs, "ApprovedWhen", whenText
+    PutField rs, "EventWhenShort", whenText
+    PutField rs, "FoodRateLabel", FoodRateLabel(invoice, eventRow)
+    PutField rs, "AlcoholRateLabel", AlcoholRateLabel(invoice, eventRow)
+    PutField rs, "ShowAdjustments", showAdj
+    PutField rs, "Extra", ""
+    rs.Update
+    rs.Close
+End Sub
+
+Private Sub EnsurePrintHead(ByVal db As Object)
+    ' Text is type 10, memo is 12, yes/no is 1. The live table was created without AddressBlock.
+    AddPrintColumn db, "Kind", 10, 16
+    AddPrintColumn db, "PayeeName", 10, 200
+    AddPrintColumn db, "AddressBlock", 10, 255
+    AddPrintColumn db, "StatementDate", 10, 20
+    AddPrintColumn db, "InvoiceNumber", 10, 40
+    AddPrintColumn db, "AmountDue", 10, 24
+    AddPrintColumn db, "EventWhen", 10, 40
+    AddPrintColumn db, "EventType", 10, 80
+    AddPrintColumn db, "Abbreviation", 10, 20
+    AddPrintColumn db, "SAPID", 10, 30
+    AddPrintColumn db, "BSSID", 10, 30
+    AddPrintColumn db, "StatusText", 10, 30
+    AddPrintColumn db, "FoodNet", 10, 24
+    AddPrintColumn db, "AlcoholNet", 10, 24
+    AddPrintColumn db, "GroupNet", 10, 24
+    AddPrintColumn db, "GrossSales", 10, 24
+    AddPrintColumn db, "Notes", 12, 0
+    AddPrintColumn db, "PreparedBy", 10, 80
+    AddPrintColumn db, "PreparedTitle", 10, 80
+    AddPrintColumn db, "PreparedWhen", 10, 20
+    AddPrintColumn db, "ReviewedBy", 10, 80
+    AddPrintColumn db, "ReviewedTitle", 10, 80
+    AddPrintColumn db, "ReviewedWhen", 10, 20
+    AddPrintColumn db, "ApprovedBy", 10, 80
+    AddPrintColumn db, "ApprovedTitle", 10, 80
+    AddPrintColumn db, "ApprovedWhen", 10, 20
+    AddPrintColumn db, "EventWhenShort", 10, 20
+    AddPrintColumn db, "FoodRateLabel", 10, 24
+    AddPrintColumn db, "AlcoholRateLabel", 10, 24
+    AddPrintColumn db, "ShowAdjustments", 1, 0
+    AddPrintColumn db, "Extra", 12, 0
+End Sub
+
+Private Sub AddPrintColumn(ByVal db As Object, ByVal fieldName As String, ByVal fieldType As Long, ByVal fieldSize As Long)
+    Dim td As Object
+    Dim fld As Object
+    Dim existing As Object
+    Set td = db.TableDefs("tblPrintHead")
+    td.Fields.Refresh
+    For Each existing In td.Fields
+        If StrComp(CStr(existing.Name), fieldName, vbTextCompare) = 0 Then Exit Sub
+    Next existing
+    On Error Resume Next
+    If fieldSize > 0 Then
+        Set fld = td.CreateField(fieldName, fieldType, fieldSize)
+    Else
+        Set fld = td.CreateField(fieldName, fieldType)
+    End If
+    td.Fields.Append fld
+    Err.Clear
+    On Error GoTo 0
+    td.Fields.Refresh
+    db.TableDefs.Refresh
+End Sub
+
+Private Function HeadText(ByVal rs As Object, ByVal fieldName As String) As String
+    Dim index As Long
+    HeadText = ""
+    For index = 0 To rs.Fields.Count - 1
+        If StrComp(CStr(rs.Fields(index).Name), fieldName, vbTextCompare) = 0 Then
+            HeadText = CStr(Nz(rs.Fields(index).Value, ""))
+            Exit Function
+        End If
+    Next index
+End Function
+
+Private Sub PutField(ByVal rs As Object, ByVal fieldName As String, ByVal value As Variant)
+    Dim index As Long
+    For index = 0 To rs.Fields.Count - 1
+        If StrComp(CStr(rs.Fields(index).Name), fieldName, vbTextCompare) = 0 Then
+            If rs.Fields(index).Type = 10 And rs.Fields(index).Size > 0 Then
+                rs.Fields(index).Value = Left$(CStr(Nz(value, "")), rs.Fields(index).Size)
+            Else
+                rs.Fields(index).Value = value
+            End If
+            Exit Sub
+        End If
+    Next index
 End Sub
 
 Private Function DateText(ByVal value As Variant) As String
@@ -303,37 +416,38 @@ Public Function EMSStatementOpen()
     Dim index As Long
     Dim extras As Object
     Set report = Reports("rptStatement")
+    CurrentDb.TableDefs.Refresh
     Set head = CurrentDb.OpenRecordset("SELECT * FROM tblPrintHead", EMS_SNAPSHOT)
     If head.EOF Then Exit Function
-    report!txtStatus = CStr(Nz(head!StatusText, ""))
-    report!txtPayee = CStr(Nz(head!PayeeName, ""))
-    report!txtAddress = CStr(Nz(head!AddressBlock, ""))
-    report!txtDate = CStr(Nz(head!StatementDate, ""))
-    report!txtInv = CStr(Nz(head!InvoiceNumber, ""))
-    report!txtDue = CStr(Nz(head!AmountDue, ""))
-    report!txtEventDate = CStr(Nz(head!EventWhen, ""))
-    report!txtEventType = CStr(Nz(head!EventType, ""))
-    report!txtAbbr = CStr(Nz(head!Abbreviation, ""))
-    report!txtSAP = CStr(Nz(head!SAPID, ""))
-    report!txtBSS = CStr(Nz(head!BSSID, ""))
-    report!txtSumFood = CStr(Nz(head!FoodNet, ""))
-    report!txtSumAlc = CStr(Nz(head!AlcoholNet, ""))
-    report!txtSumGroup = CStr(Nz(head!GroupNet, ""))
-    report!txtSumGross = CStr(Nz(head!GrossSales, ""))
-    report!txtNotes = CStr(Nz(head!Notes, ""))
-    report!txtPrep = CStr(Nz(head!PreparedBy, ""))
-    report!txtPrepTitle = CStr(Nz(head!PreparedTitle, ""))
-    report!txtPrepWhen = CStr(Nz(head!PreparedWhen, ""))
-    report!txtPrepEvent = CStr(Nz(head!EventWhenShort, ""))
-    report!txtRev = CStr(Nz(head!ReviewedBy, ""))
-    report!txtRevTitle = CStr(Nz(head!ReviewedTitle, ""))
-    report!txtRevWhen = CStr(Nz(head!ReviewedWhen, ""))
-    report!txtRevEvent = CStr(Nz(head!EventWhenShort, ""))
-    report!txtAppr = CStr(Nz(head!ApprovedBy, ""))
-    report!txtApprTitle = CStr(Nz(head!ApprovedTitle, ""))
-    report!txtApprWhen = CStr(Nz(head!ApprovedWhen, ""))
-    report!txtApprEvent = CStr(Nz(head!EventWhenShort, ""))
-    If CStr(Nz(head!Kind, "")) = "NPO" Then
+    report!txtStatus = HeadText(head, "StatusText")
+    report!txtPayee = HeadText(head, "PayeeName")
+    report!txtAddress = HeadText(head, "AddressBlock")
+    report!txtDate = HeadText(head, "StatementDate")
+    report!txtInv = HeadText(head, "InvoiceNumber")
+    report!txtDue = HeadText(head, "AmountDue")
+    report!txtEventDate = HeadText(head, "EventWhen")
+    report!txtEventType = HeadText(head, "EventType")
+    report!txtAbbr = HeadText(head, "Abbreviation")
+    report!txtSAP = HeadText(head, "SAPID")
+    report!txtBSS = HeadText(head, "BSSID")
+    report!txtSumFood = HeadText(head, "FoodNet")
+    report!txtSumAlc = HeadText(head, "AlcoholNet")
+    report!txtSumGroup = HeadText(head, "GroupNet")
+    report!txtSumGross = HeadText(head, "GrossSales")
+    report!txtNotes = HeadText(head, "Notes")
+    report!txtPrep = HeadText(head, "PreparedBy")
+    report!txtPrepTitle = HeadText(head, "PreparedTitle")
+    report!txtPrepWhen = HeadText(head, "PreparedWhen")
+    report!txtPrepEvent = HeadText(head, "EventWhenShort")
+    report!txtRev = HeadText(head, "ReviewedBy")
+    report!txtRevTitle = HeadText(head, "ReviewedTitle")
+    report!txtRevWhen = HeadText(head, "ReviewedWhen")
+    report!txtRevEvent = HeadText(head, "EventWhenShort")
+    report!txtAppr = HeadText(head, "ApprovedBy")
+    report!txtApprTitle = HeadText(head, "ApprovedTitle")
+    report!txtApprWhen = HeadText(head, "ApprovedWhen")
+    report!txtApprEvent = HeadText(head, "EventWhenShort")
+    If HeadText(head, "Kind") = "NPO" Then
         SetCaption report, "rFoodNet", "FOOD / NON-ALC NET"
         SetCaption report, "hFoodNet", "FOOD / NON-ALC NET"
         SetCaption report, "rAlcNet", "ALCOHOL NET"
@@ -344,10 +458,10 @@ Public Function EMSStatementOpen()
         SetCaption report, "rAlcNet", "NA / ALCOHOL NET"
         SetCaption report, "hAlcNet", "NA / ALCOHOL NET"
     End If
-    SetCaption report, "rFoodComm", CStr(Nz(head!FoodRateLabel, ""))
-    SetCaption report, "hFoodComm", CStr(Nz(head!FoodRateLabel, ""))
-    SetCaption report, "rAlcComm", CStr(Nz(head!AlcoholRateLabel, ""))
-    SetCaption report, "hAlcComm", CStr(Nz(head!AlcoholRateLabel, ""))
+    SetCaption report, "rFoodComm", HeadText(head, "FoodRateLabel")
+    SetCaption report, "hFoodComm", HeadText(head, "FoodRateLabel")
+    SetCaption report, "rAlcComm", HeadText(head, "AlcoholRateLabel")
+    SetCaption report, "hAlcComm", HeadText(head, "AlcoholRateLabel")
     For index = 1 To 8
         report("txtSup" & index) = ""
         report("txtSupAmt" & index) = ""
@@ -374,7 +488,7 @@ Public Function EMSStatementOpen()
         extras.MoveNext
     Loop
     extras.Close
-    LayoutColumns report, CBool(Nz(head!ShowAdjustments, False))
+    LayoutColumns report, (HeadText(head, "ShowAdjustments") = "True" Or HeadText(head, "ShowAdjustments") = "-1")
     head.Close
     Exit Function
 Failed:
