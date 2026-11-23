@@ -13,6 +13,7 @@ Public Sub BuildEMS()
     On Error GoTo Failed
     DoCmd.Hourglass True
     DoCmd.Echo False, "Building EMS"
+    CloseOpenDesign
     DropObject acForm, "frmEvent"
     DropObject acForm, "frmHub"
     DropObject acForm, "frmPayee"
@@ -44,6 +45,7 @@ Public Sub BuildEMS()
 Failed:
     DoCmd.Echo True
     DoCmd.Hourglass False
+    CloseOpenDesign
     MsgBox "Build stopped." & vbCrLf & Err.Description, vbCritical
 End Sub
 
@@ -319,7 +321,7 @@ Private Sub BuildStatement()
     Reports(temp).Controls("txtAbbr").BackColor = RGB(255, 242, 204)
     Bar temp, acHeader, "lblSales", "EVENT SALES OVERVIEW", 0, 2840, PAGE_WIDTH, 280
     captions = Array("FOOD / NON-ALCOHOL NET", "ALCOHOL NET", "GROUP NET SALES", "VALIDATED GROSS SALES")
-    names = Array("txtFoodNet", "txtAlcNet", "txtGroupNet", "txtGross")
+    names = Array("txtSumFood", "txtSumAlc", "txtSumGroup", "txtSumGross")
     For index = 0 To 3
         CaptionLabel temp, acHeader, "lblSales" & index, CStr(captions(index)), index * 2685, 3160, 2500, 220
         UnboundBox temp, acHeader, CStr(names(index)), index * 2685, 3380, 2500, 300, 12, True, 1
@@ -600,6 +602,17 @@ Private Sub SaveObject(ByVal kind As AcObjectType, ByVal currentName As String, 
     DoCmd.Save kind, currentName
     DoCmd.Close kind, currentName, acSaveYes
     DoCmd.Rename finalName, kind, currentName
+End Sub
+
+Private Sub CloseOpenDesign()
+    Dim index As Long
+    On Error Resume Next
+    For index = Reports.Count - 1 To 0 Step -1
+        DoCmd.Close acReport, Reports(index).Name, acSaveNo
+    Next index
+    For index = Forms.Count - 1 To 0 Step -1
+        DoCmd.Close acForm, Forms(index).Name, acSaveNo
+    Next index
 End Sub
 
 Private Sub DropObject(ByVal kind As AcObjectType, ByVal objectName As String)
